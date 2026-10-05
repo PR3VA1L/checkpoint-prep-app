@@ -7,7 +7,7 @@ if (!apiKey) {
 }
 
 const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
-export const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+export const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
 const WRITING_SYSTEM_PROMPT = `
 You are an expert Cambridge Primary Checkpoint English (0058/0844) Examiner for Year 6 (11-year-old students). 
