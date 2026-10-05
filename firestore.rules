@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Questions Collection
+    // Anyone (even guests) can read the global question bank.
+    // ONLY admins (via Firebase console) can write/edit questions.
+    match /questions/{document=**} {
+      allow read: if true;
+      allow write: if false; 
+    }
+
+    // 2. User Progress Collection (Spaced Repetition Data)
+    // A user can ONLY read, create, and update their OWN progress documents.
+    // They cannot access other students' scores or data.
+    match /user_progress/{docId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      
+      // Allow creation if they are logged in and assigning the doc to their own UID
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      
+      // Allow updates if the doc currently belongs to them, and they aren't trying to change the userId
+      allow update: if request.auth != null 
+                    && request.auth.uid == resource.data.userId 
+                    && request.auth.uid == request.resource.data.userId;
+                    
+      allow delete: if request.auth != null && request.auth.uid == resource.data.userId;
+    }
+  }
+}
