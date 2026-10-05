@@ -132,3 +132,47 @@ Return ONLY the transcribed text.
     throw new Error("Failed to read the handwriting. Please try a clearer picture.");
   }
 }
+
+export async function generateMCQQuestions(topics: string[], difficulty: string, count: number = 5) {
+  if (!apiKey) throw new Error("API key missing. Cannot generate questions dynamically.");
+  
+  try {
+    const prompt = `
+You are an expert Cambridge Primary Checkpoint English (0058/0844) Examiner.
+Generate exactly ${count} multiple-choice questions for 11-year-old students.
+Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'}
+Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any Cambridge Primary English topic'}
+
+For each question, provide 4 options. Only 1 option must be correct.
+Provide a clear, brief explanation for the correct answer.
+
+OUTPUT STRICTLY IN JSON FORMAT matching this TypeScript interface exactly, nothing else:
+[
+  {
+    "question": "string",
+    "options": ["string", "string", "string", "string"],
+    "correctIndex": number (0-3),
+    "explanation": "string",
+    "topic": "string (one of the Topics Allowed)",
+    "difficulty": "string (Easy, Medium, or Hard)",
+    "cambridgeStrand": "string"
+  }
+]
+
+Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
+
+    const result = await model.generateContent(prompt);
+    let text = result.response.text().trim();
+    
+    // Clean up potential markdown formatting if model misbehaves
+    if (text.startsWith('\`\`\`json')) text = text.slice(7);
+    if (text.startsWith('\`\`\`')) text = text.slice(3);
+    if (text.endsWith('\`\`\`')) text = text.slice(0, -3);
+    
+    const parsed = JSON.parse(text.trim());
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Failed to generate questions:", error);
+    return [];
+  }
+}

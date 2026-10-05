@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, Loader2, Settings2, Lightbulb } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { generateHint } from '../lib/gemini';
+import { generateHint, generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -88,8 +88,25 @@ export default function MCQPractice() {
         qList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
+      if (qList.length < 5) {
+        try {
+          const numToGenerate = 5 - qList.length;
+          const generatedQuestions = await generateMCQQuestions(selectedTopics, selectedDifficulty, numToGenerate);
+          
+          if (generatedQuestions.length > 0) {
+            // Save them to Firestore so we don't have to generate them again
+            for (const q of generatedQuestions) {
+              const docRef = await addDoc(qRef, q);
+              qList.push({ id: docRef.id, ...q });
+            }
+          }
+        } catch (genErr) {
+          console.error("Dynamic generation failed", genErr);
+        }
+      }
+
       if (qList.length === 0) {
-        setErrorMsg('No questions found for those filters. Try selecting more topics!');
+        setErrorMsg('No questions found and dynamic generation failed. Please check your AI API key.');
         setLoading(false);
         return;
       }
