@@ -1,8 +1,10 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { BookOpen, PenTool, Home, Award } from 'lucide-react';
+import { BookOpen, PenTool, Home, Award, LogOut } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Layout() {
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Home },
@@ -13,7 +15,7 @@ export default function Layout() {
   return (
     <div className="app-container">
       {/* Sidebar */}
-      <aside style={{ width: '250px', padding: '2rem 1rem' }} className="glass">
+      <aside style={{ width: '250px', padding: '2rem 1rem', display: 'flex', flexDirection: 'column' }} className="glass">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '3rem', padding: '0 1rem' }}>
           <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
             <Award size={24} />
@@ -51,14 +53,27 @@ export default function Layout() {
           })}
         </nav>
 
-        <div style={{ marginTop: 'auto', paddingTop: '4rem', padding: '1rem' }}>
-          <div className="glass-card" style={{ padding: '1rem', textAlign: 'center' }}>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Current Streak</p>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', color: 'var(--accent)' }}>
-              <span style={{ fontSize: '1.5rem' }}>🔥</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>3 Days</span>
+        <div style={{ marginTop: 'auto', padding: '1rem' }}>
+          {user && (
+            <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Signed in as</p>
+              <p style={{ fontSize: '0.875rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.displayName || user.email || 'Student'}
+              </p>
             </div>
-          </div>
+          )}
+          <button 
+            onClick={logout}
+            style={{
+              width: '100%', padding: '0.75rem', borderRadius: '0.75rem',
+              border: '1px solid var(--border)', background: 'rgba(255,255,255,0.5)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '0.5rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.875rem',
+              transition: 'all 0.2s'
+            }}
+          >
+            <LogOut size={16} /> Sign Out
+          </button>
         </div>
       </aside>
 

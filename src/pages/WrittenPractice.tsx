@@ -54,23 +54,23 @@ export default function WrittenPractice() {
     if (!file) return;
 
     setOcrLoading(true);
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
         const base64String = reader.result as string;
         const transcribedText = await extractHandwritingOCR(base64String);
         
         const chunks = transcribedText.split('__ILLEGIBLE__');
         setOcrChunks(chunks);
         setMissingWords(new Array(chunks.length > 1 ? chunks.length - 1 : 0).fill(''));
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error(error);
-      alert("Failed to read image.");
-    } finally {
-      setOcrLoading(false);
-    }
+      } catch (error) {
+        console.error(error);
+        alert("Failed to read image. Please try a clearer photo.");
+      } finally {
+        setOcrLoading(false);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleMissingWordChange = (index: number, value: string) => {

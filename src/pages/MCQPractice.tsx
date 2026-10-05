@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, Loader2, Settings2, Lightbulb } from 'lucide-react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -40,6 +40,11 @@ export default function MCQPractice() {
   // Score Screen State
   const [isFinished, setIsFinished] = useState(false);
   const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
+
+  // Auth & Gamification State (must be declared before any conditional returns)
+  const { user } = useAuth();
+  const [streak, setStreak] = useState(0);
+  const [showAnnouncer, setShowAnnouncer] = useState('');
 
   const toggleTopic = (topic: string) => {
     if (selectedTopics.includes(topic)) {
@@ -223,12 +228,7 @@ export default function MCQPractice() {
     );
   }
 
-  const { user } = useAuth();
   const currentQuestion = questions[currentIndex];
-  
-  // Gamification State
-  const [streak, setStreak] = useState(0);
-  const [showAnnouncer, setShowAnnouncer] = useState('');
 
   const triggerWrestlemaniaVoice = (streakCount: number) => {
     let word = '';
@@ -260,12 +260,17 @@ export default function MCQPractice() {
   const handleCheck = async () => {
     if (selected !== null) {
       setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: selected }));
+      const isCorrect = selected === currentQuestion.correctIndex;
+
+      // Save SRS progress in ALL modes
+      if (user) {
+        await saveQuestionProgress(user.uid, currentQuestion.id, isCorrect);
+      }
 
       if (isTestMode) {
         handleNext();
       } else {
         setIsChecked(true);
-        const isCorrect = selected === currentQuestion.correctIndex;
         
         if (isCorrect) {
           const newStreak = streak + 1;
@@ -275,10 +280,6 @@ export default function MCQPractice() {
           }
         } else {
           setStreak(0);
-        }
-
-        if (user) {
-          await saveQuestionProgress(user.uid, currentQuestion.id, isCorrect);
         }
       }
     }

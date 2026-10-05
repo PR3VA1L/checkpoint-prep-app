@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { gradeSubmission } from '../lib/gemini';
 
 const MOCK_EXAM_DATA = {
@@ -33,6 +34,36 @@ export default function ExamSimulator() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
 
+  // Refs to avoid stale closures in the timer auto-submit
+  const compAnswersRef = useRef(compAnswers);
+  const essayTextRef = useRef(essayText);
+  compAnswersRef.current = compAnswers;
+  essayTextRef.current = essayText;
+
+  const handleSubmit = useCallback(async () => {
+    setIsSubmitting(true);
+    try {
+      // Grade Comprehension
+      const compPrompt = `Passage: ${MOCK_EXAM_DATA.comprehension.passage}\nQuestions: ${JSON.stringify(MOCK_EXAM_DATA.comprehension.questions)}`;
+      const compResult = await gradeSubmission(compPrompt, JSON.stringify(compAnswersRef.current), 'Comprehension');
+
+      // Grade Writing
+      const writeResult = await gradeSubmission(MOCK_EXAM_DATA.writing.instructions, essayTextRef.current, 'Writing');
+
+      setFeedback({
+        comprehension: compResult,
+        writing: writeResult,
+        totalScore: compResult.score + writeResult.score,
+        totalMax: compResult.maxScore + writeResult.maxScore
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to grade exam. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, []);
+
   useEffect(() => {
     let timer: any;
     if (hasStarted && timeLeft > 0 && !feedback && !isSubmitting) {
@@ -48,7 +79,7 @@ export default function ExamSimulator() {
       }, 1000);
     }
     return () => clearInterval(timer);
-  }, [hasStarted, timeLeft, feedback, isSubmitting]);
+  }, [hasStarted, timeLeft, feedback, isSubmitting, handleSubmit]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
@@ -56,30 +87,6 @@ export default function ExamSimulator() {
     const s = seconds % 60;
     if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
-
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      // Grade Comprehension
-      const compPrompt = `Passage: ${MOCK_EXAM_DATA.comprehension.passage}\nQuestions: ${JSON.stringify(MOCK_EXAM_DATA.comprehension.questions)}`;
-      const compResult = await gradeSubmission(compPrompt, JSON.stringify(compAnswers), 'Comprehension');
-
-      // Grade Writing
-      const writeResult = await gradeSubmission(MOCK_EXAM_DATA.writing.instructions, essayText, 'Writing');
-
-      setFeedback({
-        comprehension: compResult,
-        writing: writeResult,
-        totalScore: compResult.score + writeResult.score,
-        totalMax: compResult.maxScore + writeResult.maxScore
-      });
-    } catch (error) {
-      console.error(error);
-      alert("Failed to grade exam. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   if (!hasStarted) {
@@ -124,6 +131,9 @@ export default function ExamSimulator() {
           <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)' }}>
             You scored {percentage}% on this Mock Exam.
           </p>
+          <Link to="/" className="btn btn-primary" style={{ marginTop: '1.5rem', textDecoration: 'none' }}>
+            Return to Dashboard
+          </Link>
         </div>
 
         <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Section 1: Reading Comprehension</h2>
