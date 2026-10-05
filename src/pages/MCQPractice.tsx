@@ -341,8 +341,7 @@ export default function MCQPractice() {
                 <span style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold', color: 'var(--text-muted)' }}>
                   Question {idx + 1} • {q.topic}
                 </span>
-                <p style={{ fontSize: '1.15rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{q.text}</p>
-                
+                <p style={{ fontSize: '1.15rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{q.question}</p>
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
                   {q.options.map((opt: string, i: number) => {
                     const isUserPick = i === userAnswerIdx;
