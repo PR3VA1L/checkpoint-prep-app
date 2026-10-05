@@ -96,8 +96,13 @@ export default function MCQPractice() {
           if (generatedQuestions.length > 0) {
             // Save them to Firestore so we don't have to generate them again
             for (const q of generatedQuestions) {
-              const docRef = await addDoc(qRef, q);
-              qList.push({ id: docRef.id, ...q });
+              try {
+                const docRef = await addDoc(qRef, q);
+                qList.push({ id: docRef.id, ...q });
+              } catch (fsErr) {
+                console.error("Could not save to Firestore (likely security rules). Using temporarily:", fsErr);
+                qList.push({ id: 'temp-' + Math.random().toString(), ...q });
+              }
             }
           }
         } catch (genErr) {
