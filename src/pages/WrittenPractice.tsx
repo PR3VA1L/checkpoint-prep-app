@@ -166,7 +166,7 @@ export default function WrittenPractice() {
     <div style={{ maxWidth: taskType === 'Comprehension' ? '1200px' : '800px', margin: '0 auto' }}>
       
       {taskType === 'Comprehension' ? (
-        <div style={{ display: 'flex', gap: '2rem' }}>
+        <div className="responsive-flex">
           {/* Left Column: Passage */}
           <div className="glass-card" style={{ flex: 1, padding: '2rem', height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
             <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{MOCK_COMPREHENSION.title}</h2>

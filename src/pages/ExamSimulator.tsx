@@ -185,7 +185,7 @@ export default function ExamSimulator() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '2rem' }}>
+      <div className="responsive-flex">
         
         {/* Left Side: Reading Material */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>

@@ -164,3 +164,12 @@ h1, h2, h3, h4, h5, h6 {
 .p-6 { padding: 1.5rem; }
 .w-full { width: 100%; }
 .text-center { text-align: center; }
+
+/* Responsive Utilities */
+@media (max-width: 768px) {
+  .app-container { flex-direction: column; }
+  aside { width: 100% !important; min-height: auto !important; padding-bottom: 1rem !important; }
+  .main-content { padding: 1rem !important; height: auto !important; }
+  .responsive-flex { flex-direction: column !important; }
+}
+.responsive-flex { display: flex; gap: 2rem; }
