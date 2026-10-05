@@ -180,5 +180,7 @@ h1, h2, h3, h4, h5, h6 {
   aside { width: 100% !important; min-height: auto !important; padding-bottom: 1rem !important; }
   .main-content { padding: 1rem !important; height: auto !important; }
   .responsive-flex { flex-direction: column !important; }
+  .scrollable-panel { height: auto !important; max-height: 50vh !important; }
 }
 .responsive-flex { display: flex; gap: 2rem; }
+.scrollable-panel { height: calc(100vh - 120px); overflow-y: auto; }

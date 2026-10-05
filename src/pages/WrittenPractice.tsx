@@ -168,7 +168,7 @@ export default function WrittenPractice() {
       {taskType === 'Comprehension' ? (
         <div className="responsive-flex">
           {/* Left Column: Passage */}
-          <div className="glass-card" style={{ flex: 1, padding: '2rem', height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+          <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem' }}>
             <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{MOCK_COMPREHENSION.title}</h2>
             <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
               {MOCK_COMPREHENSION.passage}
@@ -176,7 +176,7 @@ export default function WrittenPractice() {
           </div>
 
           {/* Right Column: Questions */}
-          <div className="glass-card" style={{ flex: 1, padding: '2rem', height: 'calc(100vh - 120px)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>
               {MOCK_COMPREHENSION.questions.map((q) => (
                 <div key={q.id} style={{ marginBottom: '2rem' }}>
@@ -321,6 +321,12 @@ export default function WrittenPractice() {
                   <p style={{ margin: 0, color: 'var(--text-muted)' }}>{item.note}</p>
                 </div>
               ))}
+            </div>
+            
+            <div style={{ marginTop: '2.5rem', textAlign: 'center' }}>
+              <button className="btn btn-secondary" onClick={() => setIsSetupComplete(false)} style={{ padding: '0.75rem 2rem' }}>
+                Back to Setup
+              </button>
             </div>
           </div>
         </div>

@@ -56,6 +56,8 @@ Your response MUST be in raw JSON format matching this exact structure:
 `;
 
 export async function gradeSubmission(promptText: string, studentSubmission: string, taskType: 'Writing' | 'Comprehension' = 'Writing') {
+  if (!apiKey) throw new Error("Gemini API key is missing. Please configure your .env.local file.");
+  
   try {
     const systemPrompt = taskType === 'Writing' ? WRITING_SYSTEM_PROMPT : COMPREHENSION_SYSTEM_PROMPT;
     
@@ -81,6 +83,7 @@ export async function gradeSubmission(promptText: string, studentSubmission: str
 }
 
 export async function generateHint(question: string, options: string[]) {
+  if (!apiKey) return "API key missing! Please configure your .env.local to enable AI hints.";
   try {
     const prompt = `
 You are an encouraging AI Tutor for an 11-year-old student preparing for the Cambridge Primary Checkpoint.
@@ -99,6 +102,7 @@ Provide a very short, 1-2 sentence "Socratic hint" that guides them towards the 
 }
 
 export async function extractHandwritingOCR(base64Image: string) {
+  if (!apiKey) throw new Error("Gemini API key is missing. Please configure your .env.local file to use OCR.");
   try {
     // Strip out the data URL prefix if present (e.g., "data:image/jpeg;base64,")
     const base64Data = base64Image.split(',')[1] || base64Image;
