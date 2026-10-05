@@ -230,6 +230,15 @@ export default function MCQPractice() {
 
   const currentQuestion = questions[currentIndex];
 
+  if (isSetupComplete && !currentQuestion && !isFinished) {
+    return (
+      <div style={{ textAlign: 'center', marginTop: '4rem' }}>
+        <Loader2 className="animate-spin" size={48} style={{ margin: '0 auto' }} color="var(--primary)" />
+        <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Preparing your questions...</p>
+      </div>
+    );
+  }
+
   const triggerWrestlemaniaVoice = (streakCount: number) => {
     let word = '';
     if (streakCount === 3) word = 'SENSATIONAL!';
@@ -344,7 +353,7 @@ export default function MCQPractice() {
                 </span>
                 <p style={{ fontSize: '1.15rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{q.question}</p>
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                  {q.options.map((opt: string, i: number) => {
+                  {(q.options || []).map((opt: string, i: number) => {
                     const isUserPick = i === userAnswerIdx;
                     const isActualAnswer = i === q.correctIndex;
                     
@@ -431,7 +440,7 @@ export default function MCQPractice() {
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {currentQuestion.options.map((opt: string, idx: number) => {
+          {(currentQuestion.options || []).map((opt: string, idx: number) => {
             let bgColor = 'rgba(255, 255, 255, 0.5)';
             let borderColor = 'var(--border)';
             let icon = null;
