@@ -331,12 +331,29 @@ export default function MCQPractice() {
     setTimeout(() => setShowAnnouncer(''), 2000);
 
     try {
-      // Play a stadium cheer instead of the robotic voice!
-      const audio = new Audio('https://actions.google.com/sounds/v1/crowds/crowd_cheer.ogg');
-      audio.volume = 0.6;
-      audio.play().catch(e => console.log('Audio autoplay blocked', e));
+      // Sports commentator voice!
+      const utterance = new SpeechSynthesisUtterance(word);
+      const voices = window.speechSynthesis.getVoices();
+      
+      // Look for a deep/announcer-like voice (UK Male or Google UK English Male usually sounds best)
+      const announcerVoice = voices.find(v => 
+        v.name.includes('Google UK English Male') || 
+        v.name.includes('Daniel') || 
+        (v.lang.includes('en-GB') && v.name.includes('Male'))
+      ) || voices.find(v => v.lang.startsWith('en'));
+
+      if (announcerVoice) utterance.voice = announcerVoice;
+      
+      // Make it sound hyped like a sports commentator
+      utterance.pitch = 0.8; // Deeper
+      utterance.rate = 1.3;  // Faster and more energetic
+      utterance.volume = 1;
+
+      // Cancel any ongoing speech so it doesn't queue up
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
     } catch (e) {
-      console.error(e);
+      console.error('Speech synthesis failed', e);
     }
   };
 
