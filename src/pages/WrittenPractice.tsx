@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
-import { extractHandwritingOCR, gradeSubmission } from '../lib/gemini';
+import { extractHandwritingOCR, gradeSubmission, generateMockExam } from '../lib/gemini';
 
 const MOCK_WRITING_PROMPT = {
   instructions: 'Write a short story (150-200 words) about a character who finds a mysterious map hidden inside a library book.',
@@ -40,16 +40,28 @@ export default function WrittenPractice() {
   const [ocrChunks, setOcrChunks] = useState<string[]>([]);
   const [missingWords, setMissingWords] = useState<string[]>([]);
   
+  const [examData, setExamData] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
 
-  const startPractice = () => {
-    setIsSetupComplete(true);
-    setFeedback(null);
-    setText('');
-    setCompAnswers({});
-    setOcrChunks([]);
-    setMissingWords([]);
+  const startPractice = async () => {
+    setIsGenerating(true);
+    try {
+      const data = await generateMockExam(activeSubject);
+      setExamData(data);
+      setIsSetupComplete(true);
+      setFeedback(null);
+      setText('');
+      setCompAnswers({});
+      setOcrChunks([]);
+      setMissingWords([]);
+    } catch (err) {
+      alert("Failed to generate task. Check connection.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,13 +101,13 @@ export default function WrittenPractice() {
       let submissionText = '';
 
       if (taskType === 'Writing') {
-        promptText = MOCK_WRITING_PROMPT.instructions;
+        promptText = examData.writing.instructions;
         submissionText = text;
       } else if (taskType === 'Comprehension') {
-        promptText = `Passage: ${MOCK_COMPREHENSION.passage}\nQuestions: ${JSON.stringify(MOCK_COMPREHENSION.questions)}`;
+        promptText = `Passage: ${examData.comprehension.passage}\nQuestions: ${JSON.stringify(examData.comprehension.questions)}`;
         submissionText = JSON.stringify(compAnswers);
       } else if (taskType === 'Upload') {
-        promptText = MOCK_WRITING_PROMPT.instructions;
+        promptText = examData.writing.instructions;
         submissionText = ocrChunks.reduce((acc, chunk, i) => {
           return acc + chunk + (missingWords[i] !== undefined ? missingWords[i] : '');
         }, '');
@@ -157,8 +169,8 @@ export default function WrittenPractice() {
             </button>
           </div>
 
-          <button className="btn btn-primary" onClick={startPractice} style={{ width: '100%', padding: '1rem' }}>
-            Start Task
+          <button className="btn btn-primary" onClick={startPractice} style={{ width: '100%', padding: '1rem' }} disabled={isGenerating}>
+            {isGenerating ? <><Loader2 className="animate-spin" style={{ display: 'inline', marginRight: '0.5rem' }} /> Generating Practice...</> : 'Start Task'}
           </button>
         </div>
       </div>
@@ -172,16 +184,16 @@ export default function WrittenPractice() {
         <div className="responsive-flex">
           {/* Left Column: Passage */}
           <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{MOCK_COMPREHENSION.title}</h2>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData.comprehension.title}</h2>
             <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
-              {MOCK_COMPREHENSION.passage}
+              {examData.comprehension.passage}
             </div>
           </div>
 
           {/* Right Column: Questions */}
           <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>
-              {MOCK_COMPREHENSION.questions.map((q) => (
+              {examData.comprehension.questions.map((q: any) => (
                 <div key={q.id} style={{ marginBottom: '2rem' }}>
                   <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
                     {q.id}. {q.text} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 'normal' }}>[{q.marks} {q.marks === 1 ? 'mark' : 'marks'}]</span>

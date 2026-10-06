@@ -182,3 +182,48 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
     return [];
   }
 }
+
+export async function generateMockExam(subject: string) {
+  if (!apiKey) throw new Error("API key missing. Cannot generate exam dynamically.");
+  
+  try {
+    const prompt = `
+You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
+Generate a full mock exam tailored to Year 6 (11-year-olds) for this subject.
+
+If subject is ENGLISH:
+Provide a reading comprehension passage (approx 200 words) and 5-7 questions worth 1-2 marks each.
+Provide a writing prompt for a short story or report (150-200 words).
+
+If subject is MATH or SCIENCE:
+Provide a "structured scenario" (like an experiment context or data set) instead of a story passage, followed by 5-7 short-answer questions.
+Provide a longer "Extended Problem Solving / Investigation" prompt for the writing section.
+
+OUTPUT STRICTLY IN JSON FORMAT matching this exact interface:
+{
+  "comprehension": {
+    "title": "string",
+    "passage": "string (the story or the scientific/math scenario)",
+    "questions": [
+      { "id": number, "text": "string", "marks": number }
+    ]
+  },
+  "writing": {
+    "instructions": "string (the prompt for the long form answer)"
+  }
+}
+
+Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
+
+    const result = await model.generateContent(prompt);
+    let text = result.response.text().trim();
+    if (text.startsWith('\`\`\`json')) text = text.slice(7);
+    if (text.startsWith('\`\`\`')) text = text.slice(3);
+    if (text.endsWith('\`\`\`')) text = text.slice(0, -3);
+    
+    return JSON.parse(text.trim());
+  } catch (error) {
+    console.error("Failed to generate exam:", error);
+    throw error;
+  }
+}

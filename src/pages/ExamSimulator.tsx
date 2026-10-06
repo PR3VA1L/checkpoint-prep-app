@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
-import { gradeSubmission } from '../lib/gemini';
+import { gradeSubmission, generateMockExam } from '../lib/gemini';
 
 const MOCK_EXAM_DATA = {
   comprehension: {
@@ -27,6 +27,8 @@ Suddenly, a gust of wind swept across the field. "The Scarlet Flyer" jerked viol
 export default function ExamSimulator() {
   const { subject } = useParams<{ subject: string }>();
   const activeSubject = subject || 'english';
+  const [examData, setExamData] = useState<any>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(3600); // 1 hour in seconds
   
@@ -35,6 +37,22 @@ export default function ExamSimulator() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
+
+  const startExam = async () => {
+    setIsGenerating(true);
+    try {
+      const data = await generateMockExam(activeSubject);
+      setExamData(data);
+      setHasStarted(true);
+      setTimeLeft(3600);
+      setCompAnswers({});
+      setEssayText('');
+    } catch (err) {
+      alert("Failed to generate exam. Please check your API key and connection.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   // Refs to avoid stale closures in the timer auto-submit
   const compAnswersRef = useRef(compAnswers);
@@ -46,11 +64,11 @@ export default function ExamSimulator() {
     setIsSubmitting(true);
     try {
       // Grade Comprehension
-      const compPrompt = `Passage: ${MOCK_EXAM_DATA.comprehension.passage}\nQuestions: ${JSON.stringify(MOCK_EXAM_DATA.comprehension.questions)}`;
+      const compPrompt = `Passage: ${examData.comprehension.passage}\nQuestions: ${JSON.stringify(examData.comprehension.questions)}`;
       const compResult = await gradeSubmission(compPrompt, JSON.stringify(compAnswersRef.current), 'Comprehension');
 
       // Grade Writing
-      const writeResult = await gradeSubmission(MOCK_EXAM_DATA.writing.instructions, essayTextRef.current, 'Writing');
+      const writeResult = await gradeSubmission(examData.writing.instructions, essayTextRef.current, 'Writing');
 
       setFeedback({
         comprehension: compResult,
@@ -106,8 +124,14 @@ export default function ExamSimulator() {
             <li>When the timer reaches zero, your paper will be automatically submitted and marked by the AI Examiner.</li>
             <li>Do not close or refresh this page during the exam.</li>
           </ul>
-          <button className="btn" style={{ background: 'var(--accent)', color: 'white', width: '100%', fontSize: '1.25rem' }} onClick={() => setHasStarted(true)}>
-            Start the Timer & Begin
+          </ul>
+          <button 
+            className="btn" 
+            style={{ background: 'var(--accent)', color: 'white', width: '100%', fontSize: '1.25rem' }} 
+            onClick={startExam}
+            disabled={isGenerating}
+          >
+            {isGenerating ? <><Loader2 className="animate-spin" style={{ display: 'inline', marginRight: '0.5rem' }} /> Generating Exam...</> : 'Start the Timer & Begin'}
           </button>
         </div>
       </div>
@@ -186,7 +210,7 @@ export default function ExamSimulator() {
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         marginBottom: '2rem'
       }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Cambridge Primary English Checkpoint</h2>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', textTransform: 'capitalize' }}>Cambridge Primary {activeSubject} Checkpoint</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: timeLeft < 300 ? 'var(--danger)' : 'var(--text-main)', fontWeight: 'bold', fontSize: '1.25rem' }}>
             <Clock /> {formatTime(timeLeft)}
@@ -202,16 +226,16 @@ export default function ExamSimulator() {
         {/* Left Side: Reading Material */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--secondary)', marginBottom: '1rem' }}>Section 1: Reading</h3>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{MOCK_EXAM_DATA.comprehension.title}</h2>
+            <h3 style={{ fontSize: '1.25rem', color: 'var(--secondary)', marginBottom: '1rem' }}>Section 1: {activeSubject === 'english' ? 'Reading' : 'Context'}</h3>
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData.comprehension.title}</h2>
             <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
-              {MOCK_EXAM_DATA.comprehension.passage}
+              {examData.comprehension.passage}
             </div>
           </div>
 
           <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '1rem' }}>Section 2: Writing Prompt</h3>
-            <p style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{MOCK_EXAM_DATA.writing.instructions}</p>
+            <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '1rem' }}>Section 2: {activeSubject === 'english' ? 'Writing Prompt' : 'Investigation'}</h3>
+            <p style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{examData.writing.instructions}</p>
           </div>
         </div>
 
@@ -220,7 +244,7 @@ export default function ExamSimulator() {
           
           <div className="glass-card" style={{ padding: '2rem' }}>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Part 1 Answers</h3>
-            {MOCK_EXAM_DATA.comprehension.questions.map((q) => (
+            {examData.comprehension.questions.map((q: any) => (
               <div key={q.id} style={{ marginBottom: '2rem' }}>
                 <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
                   {q.id}. {q.text} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 'normal' }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span>
