@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { extractHandwritingOCR, gradeSubmission } from '../lib/gemini';
 
@@ -27,6 +28,8 @@ Taking a deep breath, Leo pushed the door. It swung open with a loud *creak* tha
 };
 
 export default function WrittenPractice() {
+  const { subject } = useParams<{ subject: string }>();
+  const activeSubject = subject || 'english';
   const [taskType, setTaskType] = useState<string>('Writing');
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   

@@ -4,19 +4,41 @@ import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { generateHint, generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const TOPICS = [
-  'Punctuation',
-  'Vocabulary in Context',
-  'Purpose and Audience',
-  'Grammar',
-  'Literary Devices',
-  'Word Classes',
-  'Sentence Structure'
-];
+const SUBJECT_TOPICS: Record<string, string[]> = {
+  english: [
+    'Punctuation',
+    'Vocabulary in Context',
+    'Purpose and Audience',
+    'Grammar',
+    'Literary Devices',
+    'Word Classes',
+    'Sentence Structure'
+  ],
+  math: [
+    'Number (Fractions, Decimals, Percentages)',
+    'Mental Math & Ratio',
+    'Geometry (2D/3D shapes, Symmetry)',
+    'Measure (Time, Mass, Capacity)',
+    'Statistics (Bar charts, Line graphs)',
+    'Probability'
+  ],
+  science: [
+    'Biology (Plants, Human Systems, Habitats)',
+    'Chemistry (Materials, States of Matter)',
+    'Physics (Forces, Light, Sound)',
+    'Physics (Electricity & Magnetism)',
+    'Earth and Space'
+  ]
+};
 
 export default function MCQPractice() {
+  const { subject } = useParams<{ subject: string }>();
+  const activeSubject = subject || 'english';
+  const availableTopics = SUBJECT_TOPICS[activeSubject] || SUBJECT_TOPICS['english'];
+
   // Setup State
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
@@ -162,15 +184,15 @@ export default function MCQPractice() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <label style={{ fontWeight: 'bold' }}>Select Topics</label>
               <button 
-                onClick={selectAllTopics}
+                onClick={() => setSelectedTopics(selectedTopics.length === availableTopics.length ? [] : [...availableTopics])}
                 style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 'bold' }}
               >
-                {selectedTopics.length === TOPICS.length ? 'Deselect All' : 'Select All'}
+                {selectedTopics.length === availableTopics.length ? 'Deselect All' : 'Select All'}
               </button>
             </div>
             
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              {TOPICS.map(topic => {
+              {availableTopics.map(topic => {
                 const isSelected = selectedTopics.includes(topic);
                 return (
                   <button

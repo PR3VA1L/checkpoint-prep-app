@@ -15,6 +15,7 @@ export default function Dashboard() {
     due: 0
   });
   const [loading, setLoading] = useState(true);
+  const [selectedSubject, setSelectedSubject] = useState('english');
 
   useEffect(() => {
     const fetchProgress = async () => {
@@ -101,9 +102,34 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Subject Selector */}
+      <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
+        {['english', 'math', 'science'].map(subject => (
+          <button
+            key={subject}
+            onClick={() => setSelectedSubject(subject)}
+            style={{
+              padding: '1rem 2rem',
+              borderRadius: '1rem',
+              border: 'none',
+              background: selectedSubject === subject ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+              color: selectedSubject === subject ? 'white' : 'var(--text-main)',
+              fontWeight: 'bold',
+              fontSize: '1.1rem',
+              cursor: 'pointer',
+              textTransform: 'capitalize',
+              boxShadow: selectedSubject === subject ? '0 4px 6px -1px rgba(99, 102, 241, 0.4)' : 'none',
+              transition: 'all 0.2s'
+            }}
+          >
+            {subject}
+          </button>
+        ))}
+      </div>
+
       {/* Quick Start Actions */}
       <div>
-        <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem' }}>Jump Back In</h2>
+        <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', textTransform: 'capitalize' }}>{selectedSubject} Practice</h2>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
           
@@ -113,9 +139,9 @@ export default function Dashboard() {
             </div>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Multiple Choice</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Unlimited focused practice on grammar, vocabulary, and more.
+              Unlimited focused practice customized to your level.
             </p>
-            <Link to="/practice/mcq" className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
+            <Link to={`/practice/mcq/${selectedSubject}`} className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
               Start Practice
             </Link>
           </div>
@@ -126,9 +152,9 @@ export default function Dashboard() {
             </div>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Written Tasks & OCR</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Write or upload handwritten short stories, graded instantly by AI.
+              Write or upload handwritten tasks, graded instantly by AI.
             </p>
-            <Link to="/practice/written" className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
+            <Link to={`/practice/written/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
               Start Writing
             </Link>
           </div>
@@ -139,9 +165,9 @@ export default function Dashboard() {
             </div>
             <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Full Exam Simulator</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              A full timed past-paper combining Comprehension and Writing.
+              Full Paper 1 and Paper 2 mock exams timed under test conditions.
             </p>
-            <Link to="/practice/exam" className="btn" style={{ background: 'var(--accent)', color: 'white', width: '100%', textDecoration: 'none' }}>
+            <Link to={`/practice/exam/${selectedSubject}`} className="btn" style={{ background: 'var(--accent)', color: 'white', width: '100%', textDecoration: 'none' }}>
               Start Exam
             </Link>
           </div>

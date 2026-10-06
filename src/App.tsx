@@ -26,17 +26,17 @@ function App() {
                 <Dashboard />
               </ProtectedRoute>
             } />
-            <Route path="practice/mcq" element={
+            <Route path="practice/mcq/:subject" element={
               <ProtectedRoute>
                 <MCQPractice />
               </ProtectedRoute>
             } />
-            <Route path="practice/written" element={
+            <Route path="practice/written/:subject" element={
               <ProtectedRoute>
                 <WrittenPractice />
               </ProtectedRoute>
             } />
-            <Route path="practice/exam" element={
+            <Route path="practice/exam/:subject" element={
               <ProtectedRoute>
                 <ExamSimulator />
               </ProtectedRoute>

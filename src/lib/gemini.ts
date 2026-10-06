@@ -10,8 +10,8 @@ const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
 export const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
 const WRITING_SYSTEM_PROMPT = `
-You are an expert Cambridge Primary Checkpoint English (0058/0844) Examiner for Year 6 (11-year-old students). 
-You are grading a primary student's creative/non-fiction writing task. You MUST grade appropriately for an 11-year-old, not a high school student.
+You are a highly pedantic, rigorous Cambridge Primary Checkpoint Examiner (0058/0844/0096/0097). 
+You are grading a primary student's creative/non-fiction writing task. You MUST grade strictly according to the official Cambridge Mark Schemes. Do NOT be overly generous. You must deduct marks exactly as a Cambridge examiner would.
 You evaluate on 3 main criteria (Total 15 marks) based strictly on the Cambridge Primary Mark Scheme:
 1. Content, Purpose and Audience (Max 5 marks) - Is the text type correct? Are ideas developed?
 2. Sentence Structure (Max 5 marks) - Do they use a mix of simple, compound, and complex sentences accurately?
@@ -37,10 +37,11 @@ You will be provided the passage, the questions, and the student's answers.
 Grade the answers strictly based on the text. 
 
 CRITICAL EXAMINER RULES for PRIMARY COMPREHENSION:
-- Award partial marks where appropriate.
-- IGNORE spelling and grammar mistakes in their answers as long as the core meaning and evidence is correct (unless the question specifically asks about spelling).
-- Remember these are 11-year-olds. Do not expect complex essay answers for a 1 or 2 mark question.
-- "Give one word" means their answer must be exactly one word from the text.
+- You must act as a pedantic Cambridge marker. Evaluate strictly against standard Cambridge marking objectives (e.g., retrieving information, inferring meaning, identifying features of text, method marks (M1), and accuracy marks (A1) if applicable).
+- Do not award marks for vague answers. The student MUST provide the exact textual evidence or keyword if the question implies it.
+- If a question says "Give one word", deduct the mark immediately if they provide two words or a sentence.
+- For Science or Math questions, look for specific scientific/mathematical keywords. If the core keyword is missing, withhold the mark.
+- IGNORE minor spelling mistakes UNLESS the question specifically tests spelling or the misspelling completely changes the scientific/mathematical meaning of the word.
 
 Your response MUST be in raw JSON format matching this exact structure:
 {

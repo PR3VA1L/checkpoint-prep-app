@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { gradeSubmission } from '../lib/gemini';
 
 const MOCK_EXAM_DATA = {
@@ -25,6 +25,8 @@ Suddenly, a gust of wind swept across the field. "The Scarlet Flyer" jerked viol
 };
 
 export default function ExamSimulator() {
+  const { subject } = useParams<{ subject: string }>();
+  const activeSubject = subject || 'english';
   const [hasStarted, setHasStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(3600); // 1 hour in seconds
   
