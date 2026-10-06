@@ -4,7 +4,7 @@ import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { generateHint, generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const SUBJECT_TOPICS: Record<string, string[]> = {
@@ -36,6 +36,7 @@ const SUBJECT_TOPICS: Record<string, string[]> = {
 
 export default function MCQPractice() {
   const { subject } = useParams<{ subject: string }>();
+  const navigate = useNavigate();
   const activeSubject = subject || 'english';
   const availableTopics = SUBJECT_TOPICS[activeSubject] || SUBJECT_TOPICS['english'];
 
@@ -169,9 +170,37 @@ export default function MCQPractice() {
   if (!isSetupComplete) {
     return (
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <Settings2 color="var(--primary)" /> Configure Practice
+        <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem', textTransform: 'capitalize' }}>
+          <Settings2 color="var(--primary)" /> Configure {activeSubject} Practice
         </h1>
+
+        {/* Subject Selector */}
+        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', marginBottom: '2rem' }}>
+          {['english', 'math', 'science'].map(sub => (
+            <button
+              key={sub}
+              onClick={() => {
+                setSelectedTopics([]); // reset topics
+                navigate(`/practice/mcq/${sub}`);
+              }}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '1rem',
+                border: 'none',
+                background: activeSubject === sub ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+                color: activeSubject === sub ? 'white' : 'var(--text-main)',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+                transition: 'all 0.2s',
+                boxShadow: activeSubject === sub ? '0 4px 6px -1px rgba(99, 102, 241, 0.4)' : 'none'
+              }}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+
         <div className="glass-card" style={{ padding: '2rem' }}>
           
           <div style={{ marginBottom: '2rem' }}>
