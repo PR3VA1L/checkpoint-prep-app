@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, Loader2, Settings2, Lightbulb } from 'lucide-react';
 import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -41,6 +41,20 @@ export default function MCQPractice() {
   const [numQuestions, setNumQuestions] = useState<number | string>(10);
   const [isTestMode, setIsTestMode] = useState(false);
   const [allowHints, setAllowHints] = useState(true);
+
+  // FIX: Reset selected topics when subject changes via URL
+  useEffect(() => {
+    setSelectedTopics([]);
+    setIsSetupComplete(false);
+  }, [activeSubject]);
+
+  // FIX: Preload speech synthesis voices
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    }
+  }, []);
   
   // Practice State
   const [questions, setQuestions] = useState<any[]>([]);
@@ -74,16 +88,23 @@ export default function MCQPractice() {
 
 
   const startPractice = async () => {
+    // FIX: Guard against empty or invalid numQuestions
+    const questionCount = Number(numQuestions) || 10;
+    if (questionCount < 1) {
+      setErrorMsg('Please enter a valid number of questions (1-50).');
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
     try {
       const qRef = collection(db, 'questions');
       let qList: any[] = [];
       
-      const constraints = [];
-      const currentTopics = Object.values(SUBJECT_CATEGORIES[activeSubject as keyof typeof SUBJECT_CATEGORIES] || SUBJECT_CATEGORIES.english).flat();
+      // FIX: Always filter by subject to avoid cross-subject contamination
+      const constraints: any[] = [where('subject', '==', activeSubject)];
       
-      if (selectedTopics.length > 0 && selectedTopics.length < currentTopics.length) {
+      if (selectedTopics.length > 0) {
         constraints.push(where('topic', 'in', selectedTopics));
       }
       
@@ -91,20 +112,19 @@ export default function MCQPractice() {
         constraints.push(where('difficulty', '==', selectedDifficulty));
       }
       
-      if (constraints.length === 0) {
-        const querySnapshot = await getDocs(qRef);
-        qList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } else {
+      try {
         const q = query(qRef, ...constraints);
         const querySnapshot = await getDocs(q);
         qList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (fsErr) {
+        console.warn('Firestore query failed (possibly no index or empty collection). Falling back to question bank.', fsErr);
       }
 
       // Shuffle the list to randomize questions pulled from the database
       qList = qList.sort(() => Math.random() - 0.5);
 
       // --- NEW FALLBACK: Check local question bank first to save API tokens ---
-      if (qList.length < Number(numQuestions)) {
+      if (qList.length < questionCount) {
         const bankQuestions = QUESTION_BANK.filter(q => {
           if (q.subject !== activeSubject) return false;
           if (selectedTopics.length > 0 && !selectedTopics.includes(q.topic)) return false;
@@ -114,7 +134,7 @@ export default function MCQPractice() {
         });
         
         // Shuffle and take what we need
-        const needed = Number(numQuestions) - qList.length;
+        const needed = questionCount - qList.length;
         const selectedFromBank = bankQuestions.sort(() => Math.random() - 0.5).slice(0, needed);
         
         // Add fake IDs to bank questions
@@ -127,9 +147,9 @@ export default function MCQPractice() {
       }
 
       // --- FINAL FALLBACK: Dynamic Generation (Gemini) ---
-      if (qList.length < Number(numQuestions)) {
+      if (qList.length < questionCount) {
         try {
-          const numToGenerate = Number(numQuestions) - qList.length;
+          const numToGenerate = questionCount - qList.length;
           const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
@@ -156,7 +176,7 @@ export default function MCQPractice() {
       }
 
       // If we got more questions from the database than requested, shuffle again and trim down
-      qList = qList.sort(() => Math.random() - 0.5).slice(0, Number(numQuestions));
+      qList = qList.sort(() => Math.random() - 0.5).slice(0, questionCount);
 
       setQuestions(qList);
       setIsSetupComplete(true);
@@ -221,6 +241,18 @@ export default function MCQPractice() {
         <div className="glass-card" style={{ padding: '2rem' }}>
           
           <div style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <label style={{ fontWeight: 'bold' }}>Select Topics</label>
+              <button 
+                onClick={() => {
+                  const allTopics = Object.values(categoryObj).flat();
+                  setSelectedTopics(selectedTopics.length === allTopics.length ? [] : [...allTopics]);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 'bold' }}
+              >
+                {selectedTopics.length === Object.values(categoryObj).flat().length ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {Object.entries(categoryObj).map(([category, topics]) => (
                 <div key={category}>
@@ -356,6 +388,10 @@ export default function MCQPractice() {
             <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', padding: '1rem', borderRadius: '0.75rem', marginBottom: '1.5rem', textAlign: 'center' }}>
               {errorMsg}
             </div>
+          )}
+
+          {selectedTopics.length === 0 && (
+            <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', marginBottom: '1rem' }}>Please select at least one topic above to begin.</p>
           )}
 
           <button 

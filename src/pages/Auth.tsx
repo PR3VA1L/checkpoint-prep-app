@@ -62,7 +62,7 @@ export default function Auth() {
           Checkpoint
         </h1>
         <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem', fontSize: '1.1rem' }}>
-          Level up your English skills.
+          Cambridge Primary Checkpoint prep for English, Math & Science.
         </p>
       </div>
 
