@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { BookOpen, PenTool, Home, Award, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import FloatingCalculator from './FloatingCalculator';
 
 export default function Layout() {
   const location = useLocation();
@@ -83,6 +84,11 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Conditionally render calculator for math and science */}
+      {(location.pathname.includes('/math') || location.pathname.includes('/science')) && (
+        <FloatingCalculator />
+      )}
     </div>
   );
 }

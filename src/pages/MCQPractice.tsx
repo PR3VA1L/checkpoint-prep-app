@@ -118,7 +118,7 @@ export default function MCQPractice() {
       if (qList.length < numQuestions) {
         try {
           const numToGenerate = numQuestions - qList.length;
-          const generatedQuestions = await generateMCQQuestions(selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
+          const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
             // Save them to Firestore so we don't have to generate them again
@@ -432,6 +432,14 @@ export default function MCQPractice() {
                   Question {idx + 1} • {q.topic}
                 </span>
                 <p style={{ fontSize: '1.15rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>{q.question}</p>
+                
+                {q.visual && (
+                  <div 
+                    style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', background: 'rgba(255,255,255,0.8)', padding: '1rem', borderRadius: '1rem' }}
+                    dangerouslySetInnerHTML={{ __html: q.visual }} 
+                  />
+                )}
+
                 <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
                   {(q.options || []).map((opt: string, i: number) => {
                     const isUserPick = i === userAnswerIdx;
@@ -518,6 +526,13 @@ export default function MCQPractice() {
         <p style={{ fontSize: '1.25rem', marginBottom: '2rem', fontWeight: '500', whiteSpace: 'pre-wrap' }}>
           {currentQuestion.question}
         </p>
+
+        {currentQuestion.visual && (
+          <div 
+            style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center', background: 'rgba(255,255,255,0.8)', padding: '1rem', borderRadius: '1rem' }}
+            dangerouslySetInnerHTML={{ __html: currentQuestion.visual }} 
+          />
+        )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {(currentQuestion.options || []).map((opt: string, idx: number) => {

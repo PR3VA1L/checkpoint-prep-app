@@ -135,16 +135,18 @@ Return ONLY the transcribed text.
   }
 }
 
-export async function generateMCQQuestions(topics: string[], difficulty: string, count: number = 5, vocabLevel: string = 'Standard (11-year-old)') {
+export async function generateMCQQuestions(subject: string, topics: string[], difficulty: string, count: number = 5, vocabLevel: string = 'Standard (11-year-old)') {
   if (!apiKey) throw new Error("API key missing. Cannot generate questions dynamically.");
   
   try {
     const prompt = `
-You are an expert Cambridge Primary Checkpoint English (0058/0844) Examiner.
-Generate exactly ${count} multiple-choice questions for students.
+You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
+Generate exactly ${count} multiple-choice questions for year 6 students.
 Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'}
-Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any Cambridge Primary English topic'}
-Vocabulary/Explanation Target Level: ${vocabLevel} - Ensure the question text AND the explanation strictly match this reading level.
+Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any relevant topic'}
+Vocabulary/Explanation Target Level: ${vocabLevel} - Ensure the explanation strictly matches this reading level.
+
+For Math and Science: If the question requires a visual diagram (e.g., a geometry shape, a bar chart, a science circuit, or a food web), YOU MUST provide it using safe, inline SVG code. It must be valid <svg>...</svg> format in the 'visual' field. DO NOT use Mermaid.js. If no visual is needed, leave it null.
 
 For each question, provide 4 options. Only 1 option must be correct.
 Provide a clear, brief explanation for the correct answer tailored to the requested Vocabulary Target Level.
@@ -153,6 +155,7 @@ OUTPUT STRICTLY IN JSON FORMAT matching this TypeScript interface exactly, nothi
 [
   {
     "question": "string",
+    "visual": "string containing <svg>...</svg> or mermaid syntax, or null if not needed",
     "options": ["string", "string", "string", "string"],
     "correctIndex": number (0-3),
     "explanation": "string",
