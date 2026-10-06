@@ -7,38 +7,31 @@ import { saveQuestionProgress } from '../lib/srs';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-const SUBJECT_TOPICS: Record<string, string[]> = {
-  english: [
-    'Punctuation',
-    'Vocabulary in Context',
-    'Purpose and Audience',
-    'Grammar',
-    'Literary Devices',
-    'Word Classes',
-    'Sentence Structure'
-  ],
-  math: [
-    'Number (Fractions, Decimals, Percentages)',
-    'Mental Math & Ratio',
-    'Geometry (2D/3D shapes, Symmetry)',
-    'Measure (Time, Mass, Capacity)',
-    'Statistics (Bar charts, Line graphs)',
-    'Probability'
-  ],
-  science: [
-    'Biology (Plants, Human Systems, Habitats)',
-    'Chemistry (Materials, States of Matter)',
-    'Physics (Forces, Light, Sound)',
-    'Physics (Electricity & Magnetism)',
-    'Earth and Space'
-  ]
+const SUBJECT_CATEGORIES: Record<string, Record<string, string[]>> = {
+  english: {
+    'Reading & Comprehension': ['Vocabulary in Context', 'Purpose and Audience', 'Literary Devices'],
+    'Writing & Grammar': ['Punctuation', 'Grammar', 'Word Classes', 'Sentence Structure']
+  },
+  math: {
+    'Number': ['Fractions', 'Decimals', 'Percentages', 'Mental Math', 'Ratio'],
+    'Geometry': ['2D Shapes', '3D Shapes', 'Symmetry', 'Angles', 'Coordinates'],
+    'Measure': ['Time', 'Mass', 'Capacity', 'Length', 'Area & Perimeter'],
+    'Data Handling': ['Bar charts', 'Line graphs', 'Probability', 'Averages']
+  },
+  science: {
+    'Biology': ['Plants', 'Human Systems', 'Habitats', 'Food Chains', 'Microorganisms'],
+    'Chemistry': ['Materials', 'States of Matter', 'Reversible Changes', 'Properties'],
+    'Physics': ['Forces', 'Light', 'Sound', 'Electricity', 'Magnetism'],
+    'Earth & Space': ['Earth', 'Solar System', 'Moon Phases']
+  }
 };
 
 export default function MCQPractice() {
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
   const activeSubject = subject || 'english';
-  const availableTopics = SUBJECT_TOPICS[activeSubject] || SUBJECT_TOPICS['english'];
+  const categoryObj = SUBJECT_CATEGORIES[activeSubject] || SUBJECT_CATEGORIES['english'];
+  const availableTopics = Object.values(categoryObj).flat();
 
   // Setup State
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -88,7 +81,7 @@ export default function MCQPractice() {
       let qList = [];
       
       const constraints = [];
-      const currentTopics = SUBJECT_TOPICS[activeSubject as keyof typeof SUBJECT_TOPICS] || SUBJECT_TOPICS.english;
+      const currentTopics = Object.values(SUBJECT_CATEGORIES[activeSubject as keyof typeof SUBJECT_CATEGORIES] || SUBJECT_CATEGORIES.english).flat();
       
       if (selectedTopics.length > 0 && selectedTopics.length < currentTopics.length) {
         constraints.push(where('topic', 'in', selectedTopics));
@@ -204,39 +197,55 @@ export default function MCQPractice() {
         <div className="glass-card" style={{ padding: '2rem' }}>
           
           <div style={{ marginBottom: '2rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <label style={{ fontWeight: 'bold' }}>Select Topics</label>
-              <button 
-                onClick={() => setSelectedTopics(selectedTopics.length === availableTopics.length ? [] : [...availableTopics])}
-                style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 'bold' }}
-              >
-                {selectedTopics.length === availableTopics.length ? 'Deselect All' : 'Select All'}
-              </button>
-            </div>
-            
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-              {availableTopics.map(topic => {
-                const isSelected = selectedTopics.includes(topic);
-                return (
-                  <button
-                    key={topic}
-                    onClick={() => toggleTopic(topic)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '2rem',
-                      border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
-                      background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
-                      color: isSelected ? 'white' : 'var(--text-main)',
-                      cursor: 'pointer',
-                      fontWeight: isSelected ? 'bold' : 'normal',
-                      transition: 'all 0.2s',
-                      fontFamily: 'inherit'
-                    }}
-                  >
-                    {topic}
-                  </button>
-                );
-              })}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {Object.entries(categoryObj).map(([category, topics]) => (
+                <div key={category}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '0.25rem' }}>
+                    <h3 style={{ fontSize: '0.9rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, fontWeight: 'bold' }}>
+                      {category}
+                    </h3>
+                    <button 
+                      onClick={() => {
+                        const allSelected = topics.every(t => selectedTopics.includes(t));
+                        if (allSelected) {
+                          setSelectedTopics(selectedTopics.filter(t => !topics.includes(t)));
+                        } else {
+                          const newTopics = new Set([...selectedTopics, ...topics]);
+                          setSelectedTopics(Array.from(newTopics));
+                        }
+                      }}
+                      style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 'bold', textTransform: 'uppercase' }}
+                    >
+                      {topics.every(t => selectedTopics.includes(t)) ? 'Deselect Group' : 'Select Group'}
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {topics.map(topic => {
+                      const isSelected = selectedTopics.includes(topic);
+                      return (
+                        <button
+                          key={topic}
+                          onClick={() => toggleTopic(topic)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '2rem',
+                            border: `2px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                            background: isSelected ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+                            color: isSelected ? 'white' : 'var(--text-main)',
+                            cursor: 'pointer',
+                            fontWeight: isSelected ? 'bold' : 'normal',
+                            transition: 'all 0.2s',
+                            fontFamily: 'inherit',
+                            fontSize: '0.95rem'
+                          }}
+                        >
+                          {topic}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
