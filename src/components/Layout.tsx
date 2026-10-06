@@ -7,10 +7,12 @@ export default function Layout() {
   const location = useLocation();
   const { user, logout } = useAuth();
 
+  const currentSubject = location.pathname.split('/')[3] || 'english';
+
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Home },
-    { path: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
-    { path: '/practice/written', label: 'Written Tasks', icon: PenTool },
+    { path: `/practice/mcq/${currentSubject}`, match: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
+    { path: `/practice/written/${currentSubject}`, match: '/practice/written', label: 'Written Tasks', icon: PenTool },
   ];
 
   return (
@@ -26,7 +28,7 @@ export default function Layout() {
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = location.pathname === item.path || (item.match && location.pathname.startsWith(item.match));
             const Icon = item.icon;
             
             return (

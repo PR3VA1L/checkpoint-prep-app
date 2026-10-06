@@ -41,6 +41,9 @@ function App() {
                 <ExamSimulator />
               </ProtectedRoute>
             } />
+            <Route path="practice/mcq" element={<Navigate to="english" replace />} />
+            <Route path="practice/written" element={<Navigate to="english" replace />} />
+            <Route path="practice/exam" element={<Navigate to="english" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
