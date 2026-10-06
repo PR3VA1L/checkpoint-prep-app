@@ -8,7 +8,7 @@ if (!apiKey) {
 }
 
 const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
-export const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+export const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const WRITING_SYSTEM_PROMPT = `
 You are a highly pedantic, rigorous Cambridge Primary Checkpoint Examiner (0058/0844/0096/0097). 
