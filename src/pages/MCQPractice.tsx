@@ -22,6 +22,7 @@ export default function MCQPractice() {
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [vocabLevel, setVocabLevel] = useState('Standard (11-year-old)');
+  const [numQuestions, setNumQuestions] = useState(10);
   const [isTestMode, setIsTestMode] = useState(false);
   const [allowHints, setAllowHints] = useState(true);
   
@@ -89,9 +90,12 @@ export default function MCQPractice() {
         qList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
-      if (qList.length < 5) {
+      // Shuffle the list to randomize questions pulled from the database
+      qList = qList.sort(() => Math.random() - 0.5);
+
+      if (qList.length < numQuestions) {
         try {
-          const numToGenerate = 5 - qList.length;
+          const numToGenerate = numQuestions - qList.length;
           const generatedQuestions = await generateMCQQuestions(selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
@@ -117,7 +121,8 @@ export default function MCQPractice() {
         return;
       }
 
-      qList = qList.sort(() => Math.random() - 0.5);
+      // If we got more questions from the database than requested, shuffle again and trim down
+      qList = qList.sort(() => Math.random() - 0.5).slice(0, numQuestions);
 
       setQuestions(qList);
       setIsSetupComplete(true);
@@ -221,6 +226,22 @@ export default function MCQPractice() {
             </select>
           </div>
 
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.75rem' }}>Number of Questions (1-50)</label>
+            <input 
+              type="number" 
+              min="1" 
+              max="50"
+              value={numQuestions}
+              onChange={(e) => setNumQuestions(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{ 
+                width: '100%', padding: '1rem', borderRadius: '0.75rem', 
+                border: '1px solid var(--border)', background: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '1rem', outline: 'none'
+              }}
+            />
+          </div>
+
           <div style={{ marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
               <input 
@@ -294,17 +315,10 @@ export default function MCQPractice() {
     setTimeout(() => setShowAnnouncer(''), 2000);
 
     try {
-      const msg = new SpeechSynthesisUtterance(word);
-      msg.pitch = 0.1; // Super deep voice
-      msg.rate = 0.8;
-      msg.volume = 1;
-      
-      // Try to find a male English voice if possible
-      const voices = window.speechSynthesis.getVoices();
-      const deepVoice = voices.find(v => v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('daniel') || v.name.toLowerCase().includes('david'));
-      if (deepVoice) msg.voice = deepVoice;
-
-      window.speechSynthesis.speak(msg);
+      // Play a stadium cheer instead of the robotic voice!
+      const audio = new Audio('https://actions.google.com/sounds/v1/crowds/crowd_cheer.ogg');
+      audio.volume = 0.6;
+      audio.play().catch(e => console.log('Audio autoplay blocked', e));
     } catch (e) {
       console.error(e);
     }
