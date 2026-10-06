@@ -78,13 +78,6 @@ export default function MCQPractice() {
     }
   };
 
-  const selectAllTopics = () => {
-    if (selectedTopics.length === TOPICS.length) {
-      setSelectedTopics([]);
-    } else {
-      setSelectedTopics([...TOPICS]);
-    }
-  };
 
   const startPractice = async () => {
     setLoading(true);
@@ -94,8 +87,9 @@ export default function MCQPractice() {
       let qList = [];
       
       const constraints = [];
+      const currentTopics = SUBJECT_TOPICS[activeSubject as keyof typeof SUBJECT_TOPICS] || SUBJECT_TOPICS.english;
       
-      if (selectedTopics.length > 0 && selectedTopics.length < TOPICS.length) {
+      if (selectedTopics.length > 0 && selectedTopics.length < currentTopics.length) {
         constraints.push(where('topic', 'in', selectedTopics));
       }
       

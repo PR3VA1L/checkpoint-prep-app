@@ -3,26 +3,6 @@ import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { gradeSubmission, generateMockExam } from '../lib/gemini';
 
-const MOCK_EXAM_DATA = {
-  comprehension: {
-    title: 'The Great Balloon Race',
-    passage: `It was a crisp, clear morning in September, the perfect day for the annual Great Balloon Race. Hundreds of people had gathered in the park, their faces turned towards the sky as massive, colorful hot air balloons slowly began to inflate. The roaring sound of the gas burners filled the air, like giant dragons waking from a long sleep.
-
-Twelve-year-old Mia stood at the edge of the field, clutching her notebook. She wasn't just watching; she was reporting for her school newspaper. Her favorite balloon, "The Scarlet Flyer," was a bright, dazzling red and looked bigger than a house. Its pilot, Captain Thorne, was busy checking the ropes. He looked nervous. 
-
-Suddenly, a gust of wind swept across the field. "The Scarlet Flyer" jerked violently, pulling one of its anchor ropes loose. Mia gasped as the massive balloon tipped dangerously to one side. The crowd fell silent, watching in horror. Captain Thorne acted quickly, pulling a lever that released a blast of hot air, stabilizing the balloon just in time. The crowd erupted into cheers.`,
-    questions: [
-      { id: 1, text: 'What month did the Great Balloon Race take place?', marks: 1 },
-      { id: 2, text: 'Give one simile used in the first paragraph to describe the sound of the burners.', marks: 1 },
-      { id: 3, text: 'Why was Mia at the balloon race?', marks: 1 },
-      { id: 4, text: 'Look at the second paragraph. Which word tells you that the red balloon was very bright and impressive?', marks: 1 },
-      { id: 5, text: 'What caused the balloon to tip dangerously? Give a reason from the text.', marks: 2 }
-    ]
-  },
-  writing: {
-    instructions: 'Write a news report (150-200 words) about a surprising event that happened at a local festival. Remember to include a catchy headline, explain what happened, and include a quote from a witness.'
-  }
-};
 
 export default function ExamSimulator() {
   const { subject } = useParams<{ subject: string }>();
@@ -57,10 +37,13 @@ export default function ExamSimulator() {
   // Refs to avoid stale closures in the timer auto-submit
   const compAnswersRef = useRef(compAnswers);
   const essayTextRef = useRef(essayText);
-  compAnswersRef.current = compAnswers;
-  essayTextRef.current = essayText;
+  useEffect(() => {
+    compAnswersRef.current = compAnswers;
+    essayTextRef.current = essayText;
+  }, [compAnswers, essayText]);
 
   const handleSubmit = useCallback(async () => {
+    if (!examData) return;
     setIsSubmitting(true);
     try {
       // Grade Comprehension
@@ -82,7 +65,7 @@ export default function ExamSimulator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, []);
+  }, [examData]);
 
   useEffect(() => {
     let timer: any;
@@ -123,7 +106,6 @@ export default function ExamSimulator() {
             <li>The paper consists of a <strong>Reading Comprehension</strong> section and a <strong>Writing Task</strong>.</li>
             <li>When the timer reaches zero, your paper will be automatically submitted and marked by the AI Examiner.</li>
             <li>Do not close or refresh this page during the exam.</li>
-          </ul>
           </ul>
           <button 
             className="btn" 

@@ -1,31 +1,8 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { extractHandwritingOCR, gradeSubmission, generateMockExam } from '../lib/gemini';
 
-const MOCK_WRITING_PROMPT = {
-  instructions: 'Write a short story (150-200 words) about a character who finds a mysterious map hidden inside a library book.',
-};
-
-const MOCK_COMPREHENSION = {
-  title: 'The Secret of the Old Mill',
-  passage: `The old flour mill stood at the edge of the village, silent and forgotten. Its wooden wheel had not turned for fifty years, and thick, green ivy crept up its stone walls like long fingers. Most of the villagers avoided it, especially after dark, whispering stories about strange noises that echoed from inside.
-  
-Leo, however, was not like most villagers. He was ten years old and had a mind full of questions and a pocket full of useful things, like string, a magnifying glass, and a slightly squashed sandwich. It was a Tuesday afternoon, and the sun was just beginning to dip behind the hills, casting long, spooky shadows across the grass.
-
-As Leo approached the mill's heavy wooden door, he noticed something unusual. The thick layer of dust on the ground had been disturbed. There were fresh footprints leading right up to the entrance. They were small, perhaps belonging to an animal, or maybe... someone else. 
-
-Taking a deep breath, Leo pushed the door. It swung open with a loud *creak* that made him jump. Inside, it was dark and smelled strongly of damp wood and old flour. Suddenly, a tiny scuffling noise came from the corner of the room. Leo froze. He reached into his pocket, pulled out his flashlight, and clicked it on. The beam of light swept across the dusty floor, stopping on a small, huddled shape hiding behind a broken barrel.`,
-  questions: [
-    { id: 1, text: 'Look at the first paragraph. What did the ivy creeping up the walls look like?', marks: 1 },
-    { id: 2, text: 'Why did the villagers avoid the mill after dark?', marks: 1 },
-    { id: 3, text: 'Give two things Leo had in his pocket.', marks: 2 },
-    { id: 4, text: 'What time of day did Leo visit the mill? Give a reason from the text to support your answer.', marks: 2 },
-    { id: 5, text: 'What made Leo jump when he opened the door?', marks: 1 },
-    { id: 6, text: 'Look at the last paragraph. Write down one word that tells you the room was wet or humid.', marks: 1 },
-    { id: 7, text: 'What do you think the "small, huddled shape" is? Give a reason using evidence from the text.', marks: 2 }
-  ]
-};
 
 export default function WrittenPractice() {
   const { subject } = useParams<{ subject: string }>();
@@ -226,7 +203,7 @@ export default function WrittenPractice() {
         <div className="glass-card" style={{ padding: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Upload Handwritten Practice</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Prompt: <strong>{MOCK_WRITING_PROMPT.instructions}</strong>
+            Prompt: <strong>{examData?.writing?.instructions || "Write your essay here."}</strong>
           </p>
 
           {ocrChunks.length === 0 ? (
@@ -291,7 +268,7 @@ export default function WrittenPractice() {
         <div className="glass-card" style={{ padding: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Writing Task</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Prompt: <strong>{MOCK_WRITING_PROMPT.instructions}</strong>
+            Prompt: <strong>{examData?.writing?.instructions || "Write your essay here."}</strong>
           </p>
 
           <textarea
