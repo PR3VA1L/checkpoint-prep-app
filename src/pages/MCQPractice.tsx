@@ -6,6 +6,7 @@ import { generateHint, generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { QUESTION_BANK } from '../data/questionBank';
 
 const SUBJECT_CATEGORIES: Record<string, Record<string, string[]>> = {
   english: {
@@ -37,7 +38,7 @@ export default function MCQPractice() {
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [vocabLevel, setVocabLevel] = useState('Standard (11-year-old)');
-  const [numQuestions, setNumQuestions] = useState(10);
+  const [numQuestions, setNumQuestions] = useState<number | string>(10);
   const [isTestMode, setIsTestMode] = useState(false);
   const [allowHints, setAllowHints] = useState(true);
   
@@ -102,9 +103,33 @@ export default function MCQPractice() {
       // Shuffle the list to randomize questions pulled from the database
       qList = qList.sort(() => Math.random() - 0.5);
 
-      if (qList.length < numQuestions) {
+      // --- NEW FALLBACK: Check local question bank first to save API tokens ---
+      if (qList.length < Number(numQuestions)) {
+        const bankQuestions = QUESTION_BANK.filter(q => {
+          if (q.subject !== activeSubject) return false;
+          if (selectedTopics.length > 0 && !selectedTopics.includes(q.topic)) return false;
+          if (selectedDifficulty !== 'All' && q.difficulty !== selectedDifficulty) return false;
+          // Ensure it's not already in qList
+          return !qList.some(existingQ => existingQ.question === q.question);
+        });
+        
+        // Shuffle and take what we need
+        const needed = Number(numQuestions) - qList.length;
+        const selectedFromBank = bankQuestions.sort(() => Math.random() - 0.5).slice(0, needed);
+        
+        // Add fake IDs to bank questions
+        const formattedBank = selectedFromBank.map(q => ({
+          ...q,
+          id: 'bank-' + Math.random().toString(36).substring(7)
+        }));
+        
+        qList = [...qList, ...formattedBank];
+      }
+
+      // --- FINAL FALLBACK: Dynamic Generation (Gemini) ---
+      if (qList.length < Number(numQuestions)) {
         try {
-          const numToGenerate = numQuestions - qList.length;
+          const numToGenerate = Number(numQuestions) - qList.length;
           const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
@@ -131,7 +156,7 @@ export default function MCQPractice() {
       }
 
       // If we got more questions from the database than requested, shuffle again and trim down
-      qList = qList.sort(() => Math.random() - 0.5).slice(0, numQuestions);
+      qList = qList.sort(() => Math.random() - 0.5).slice(0, Number(numQuestions));
 
       setQuestions(qList);
       setIsSetupComplete(true);
@@ -286,7 +311,11 @@ export default function MCQPractice() {
               min="1" 
               max="50"
               value={numQuestions}
-              onChange={(e) => setNumQuestions(Math.min(50, Math.max(1, parseInt(e.target.value) || 1)))}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '') setNumQuestions('');
+                else setNumQuestions(Math.min(50, Math.max(1, parseInt(val) || 1)));
+              }}
               style={{ 
                 width: '100%', padding: '1rem', borderRadius: '0.75rem', 
                 border: '1px solid var(--border)', background: 'rgba(255, 255, 255, 0.7)',
