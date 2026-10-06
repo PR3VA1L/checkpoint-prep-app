@@ -31,7 +31,6 @@ export default function MCQPractice() {
   const navigate = useNavigate();
   const activeSubject = subject || 'english';
   const categoryObj = SUBJECT_CATEGORIES[activeSubject] || SUBJECT_CATEGORIES['english'];
-  const availableTopics = Object.values(categoryObj).flat();
 
   // Setup State
   const [isSetupComplete, setIsSetupComplete] = useState(false);
