@@ -78,7 +78,7 @@ export default function MCQPractice() {
     setErrorMsg('');
     try {
       const qRef = collection(db, 'questions');
-      let qList = [];
+      let qList: any[] = [];
       
       const constraints = [];
       const currentTopics = Object.values(SUBJECT_CATEGORIES[activeSubject as keyof typeof SUBJECT_CATEGORIES] || SUBJECT_CATEGORIES.english).flat();
