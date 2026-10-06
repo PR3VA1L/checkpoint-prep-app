@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
@@ -184,7 +185,10 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 }
 
 export async function generateMockExam(subject: string) {
-  if (!apiKey) throw new Error("API key missing. Cannot generate exam dynamically.");
+  if (!apiKey) {
+    console.warn("API key missing. Falling back to local mock exam.");
+    return MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
+  }
   
   try {
     const prompt = `
@@ -223,7 +227,7 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
     
     return JSON.parse(text.trim());
   } catch (error) {
-    console.error("Failed to generate exam:", error);
-    throw error;
+    console.error("Failed to generate exam dynamically, falling back to local:", error);
+    return MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
   }
 }
