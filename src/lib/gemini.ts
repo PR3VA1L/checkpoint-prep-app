@@ -82,7 +82,7 @@ export async function gradeSubmission(promptText: string, studentSubmission: str
   }
 }
 
-export async function generateHint(question: string, options: string[]) {
+export async function generateHint(question: string, options: string[], vocabLevel: string = 'Standard (11-year-old)') {
   if (!apiKey) return "API key missing! Please configure your .env.local to enable AI hints.";
   try {
     const prompt = `
@@ -92,6 +92,7 @@ Question: ${question}
 Options: ${options.join(', ')}
 
 Provide a very short, 1-2 sentence "Socratic hint" that guides them towards the right concept without giving away the answer. Do NOT tell them which option is correct. Keep it fun and encouraging.
+Adjust your vocabulary strictly to this level: ${vocabLevel}
     `;
     const result = await model.generateContent(prompt);
     return result.response.text().trim();
@@ -133,18 +134,19 @@ Return ONLY the transcribed text.
   }
 }
 
-export async function generateMCQQuestions(topics: string[], difficulty: string, count: number = 5) {
+export async function generateMCQQuestions(topics: string[], difficulty: string, count: number = 5, vocabLevel: string = 'Standard (11-year-old)') {
   if (!apiKey) throw new Error("API key missing. Cannot generate questions dynamically.");
   
   try {
     const prompt = `
 You are an expert Cambridge Primary Checkpoint English (0058/0844) Examiner.
-Generate exactly ${count} multiple-choice questions for 11-year-old students.
+Generate exactly ${count} multiple-choice questions for students.
 Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'}
 Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any Cambridge Primary English topic'}
+Vocabulary/Explanation Target Level: ${vocabLevel} - Ensure the question text AND the explanation strictly match this reading level.
 
 For each question, provide 4 options. Only 1 option must be correct.
-Provide a clear, brief explanation for the correct answer.
+Provide a clear, brief explanation for the correct answer tailored to the requested Vocabulary Target Level.
 
 OUTPUT STRICTLY IN JSON FORMAT matching this TypeScript interface exactly, nothing else:
 [

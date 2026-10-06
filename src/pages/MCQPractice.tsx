@@ -21,6 +21,7 @@ export default function MCQPractice() {
   const [isSetupComplete, setIsSetupComplete] = useState(false);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
+  const [vocabLevel, setVocabLevel] = useState('Standard (11-year-old)');
   const [isTestMode, setIsTestMode] = useState(false);
   const [allowHints, setAllowHints] = useState(true);
   
@@ -91,7 +92,7 @@ export default function MCQPractice() {
       if (qList.length < 5) {
         try {
           const numToGenerate = 5 - qList.length;
-          const generatedQuestions = await generateMCQQuestions(selectedTopics, selectedDifficulty, numToGenerate);
+          const generatedQuestions = await generateMCQQuestions(selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
             // Save them to Firestore so we don't have to generate them again
@@ -139,7 +140,7 @@ export default function MCQPractice() {
     if (!questions[currentIndex] || isFetchingHint || currentHint) return;
     setIsFetchingHint(true);
     setUsedHint(true);
-    const hint = await generateHint(questions[currentIndex].question, questions[currentIndex].options);
+    const hint = await generateHint(questions[currentIndex].question, questions[currentIndex].options, vocabLevel);
     setCurrentHint(hint);
     setIsFetchingHint(false);
   };
@@ -203,6 +204,23 @@ export default function MCQPractice() {
             </select>
           </div>
 
+          <div style={{ marginBottom: '2rem' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.75rem' }}>Vocabulary & Explanation Complexity</label>
+            <select 
+              value={vocabLevel} 
+              onChange={(e) => setVocabLevel(e.target.value)}
+              style={{ 
+                width: '100%', padding: '1rem', borderRadius: '0.75rem', 
+                border: '1px solid var(--border)', background: 'rgba(255, 255, 255, 0.7)',
+                fontSize: '1rem', cursor: 'pointer', outline: 'none'
+              }}
+            >
+              <option value="Simple (8-9 year old, very basic words)">Simple (Basic vocab for younger readers)</option>
+              <option value="Standard (11-year-old)">Standard (Exam Level)</option>
+              <option value="Advanced (13+ year old, rich vocabulary)">Advanced (Challenge Level)</option>
+            </select>
+          </div>
+
           <div style={{ marginBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
               <input 
@@ -241,9 +259,13 @@ export default function MCQPractice() {
             className="btn btn-primary" 
             onClick={startPractice}
             disabled={loading || selectedTopics.length === 0}
-            style={{ width: '100%', opacity: selectedTopics.length === 0 ? 0.5 : 1 }}
+            style={{ width: '100%', opacity: selectedTopics.length === 0 ? 0.5 : 1, minHeight: '3.5rem' }}
           >
-            {loading ? <Loader2 className="animate-pulse-glow" /> : 'Start Practicing'}
+            {loading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                <Loader2 className="animate-spin" /> Preparing questions...
+              </div>
+            ) : 'Start Practicing'}
           </button>
         </div>
       </div>
