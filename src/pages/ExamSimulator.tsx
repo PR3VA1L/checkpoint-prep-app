@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { gradeSubmission, generateMockExam } from '../lib/gemini';
 
 
 export default function ExamSimulator() {
   const { subject } = useParams<{ subject: string }>();
+  const navigate = useNavigate();
   const activeSubject = subject || 'english';
   const [examData, setExamData] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -95,7 +96,32 @@ export default function ExamSimulator() {
   if (!hasStarted) {
     return (
       <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Full Exam Simulator</h1>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', textTransform: 'capitalize' }}>Full {activeSubject} Exam Simulator</h1>
+        
+        {/* Subject Selector */}
+        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', marginBottom: '2rem', justifyContent: 'center' }}>
+          {['english', 'math', 'science'].map(sub => (
+            <button
+              key={sub}
+              onClick={() => navigate(`/practice/exam/${sub}`)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '1rem',
+                border: 'none',
+                background: activeSubject === sub ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                color: activeSubject === sub ? 'white' : 'var(--text-main)',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+                transition: 'all 0.2s',
+                boxShadow: activeSubject === sub ? '0 4px 6px -1px rgba(245, 158, 11, 0.4)' : 'none'
+              }}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'left' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', color: 'var(--accent)' }}>
             <AlertTriangle size={32} />

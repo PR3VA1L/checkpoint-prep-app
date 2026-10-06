@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { extractHandwritingOCR, gradeSubmission, generateMockExam } from '../lib/gemini';
 
 
 export default function WrittenPractice() {
   const { subject } = useParams<{ subject: string }>();
+  const navigate = useNavigate();
   const activeSubject = subject || 'english';
   const [taskType, setTaskType] = useState<string>('Writing');
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -102,9 +103,34 @@ export default function WrittenPractice() {
   if (!isSetupComplete) {
     return (
       <div style={{ maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
-          <PenTool color="var(--primary)" /> Configure Task
+        <h1 style={{ fontSize: '2rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem', textTransform: 'capitalize' }}>
+          <PenTool color="var(--primary)" /> Configure {activeSubject} Task
         </h1>
+
+        {/* Subject Selector */}
+        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', marginBottom: '2rem', justifyContent: 'center' }}>
+          {['english', 'math', 'science'].map(sub => (
+            <button
+              key={sub}
+              onClick={() => navigate(`/practice/written/${sub}`)}
+              style={{
+                padding: '0.75rem 1.5rem',
+                borderRadius: '1rem',
+                border: 'none',
+                background: activeSubject === sub ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+                color: activeSubject === sub ? 'white' : 'var(--text-main)',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+                transition: 'all 0.2s',
+                boxShadow: activeSubject === sub ? '0 4px 6px -1px rgba(99, 102, 241, 0.4)' : 'none'
+              }}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+
         <div className="glass-card" style={{ padding: '2.5rem' }}>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
