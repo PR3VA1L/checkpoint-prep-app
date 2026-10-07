@@ -118,11 +118,12 @@ export default function MCQPractice() {
       let progressIds = new Set<string>();
       if (user) {
         try {
-          const snapshot = await getDocs(collection(db, 'users', user.uid, 'progress'));
+          const progressQuery = query(collection(db, 'user_progress'), where('userId', '==', user.uid));
+          const snapshot = await getDocs(progressQuery);
           snapshot.forEach(doc => {
             // Include heavily seen questions so we skip them
-            if (doc.data().consecutiveCorrect > 1 || doc.data().interval > 1) {
-              progressIds.add(doc.id.replace(`${user.uid}_`, ''));
+            if (doc.data().consecutiveCorrect > 0 || doc.data().interval > 0) {
+              progressIds.add(doc.data().questionId);
             }
           });
         } catch (e) {
@@ -187,6 +188,22 @@ export default function MCQPractice() {
     setLoading(true);
     setErrorMsg('');
     try {
+      let progressIds = new Set<string>();
+      if (user) {
+        try {
+          const progressQuery = query(collection(db, 'user_progress'), where('userId', '==', user.uid));
+          const snapshot = await getDocs(progressQuery);
+          snapshot.forEach(doc => {
+            // Include seen questions so we skip them
+            if (doc.data().consecutiveCorrect > 0 || doc.data().interval > 0) {
+              progressIds.add(doc.data().questionId);
+            }
+          });
+        } catch (e) {
+          console.error('Failed to get progress', e);
+        }
+      }
+
       const qRef = collection(db, 'questions');
       let qList: any[] = [];
       
@@ -212,6 +229,9 @@ export default function MCQPractice() {
       // Shuffle the list to randomize questions pulled from the database
       qList = qList.sort(() => Math.random() - 0.5);
 
+      // Filter out seen questions
+      qList = qList.filter(q => !progressIds.has(q.id));
+
       // --- NEW FALLBACK: Check local question bank first to save API tokens ---
       if (qList.length < questionCount) {
         const bankQuestions = QUESTION_BANK.filter(q => {
@@ -222,12 +242,8 @@ export default function MCQPractice() {
           return !qList.some(existingQ => existingQ.question === q.question);
         });
         
-        // Shuffle and take what we need
-        const needed = questionCount - qList.length;
-        const selectedFromBank = bankQuestions.sort(() => Math.random() - 0.5).slice(0, needed);
-        
-        // Add stable IDs to bank questions
-        const formattedBank = selectedFromBank.map(q => {
+        // Add stable IDs to bank questions to check against progressIds
+        const formattedBank = bankQuestions.map(q => {
           let hash = 0;
           for (let i = 0; i < q.question.length; i++) {
             hash = (hash << 5) - hash + q.question.charCodeAt(i);
@@ -239,7 +255,20 @@ export default function MCQPractice() {
           };
         });
         
-        qList = [...qList, ...formattedBank];
+        // Filter out seen questions
+        let unseenBank = formattedBank.filter(q => !progressIds.has(q.id));
+        
+        // If we don't have enough unseen, fall back to reusing seen ones
+        if (unseenBank.length < (questionCount - qList.length)) {
+           // We prioritize unseen, but add seen ones to fill the gap
+           const seenBank = formattedBank.filter(q => progressIds.has(q.id));
+           unseenBank = [...unseenBank, ...seenBank];
+        }
+
+        const needed = questionCount - qList.length;
+        const selectedFromBank = unseenBank.sort(() => Math.random() - 0.5).slice(0, needed);
+        
+        qList = [...qList, ...selectedFromBank];
       }
 
       // --- FINAL FALLBACK: Dynamic Generation (Gemini) ---

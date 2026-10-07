@@ -144,8 +144,9 @@ export async function generateMCQQuestions(subject: string, topics: string[], di
     const prompt = `
 You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
 Generate exactly ${count} multiple-choice questions for year 6 students.
-Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'}
-Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any relevant topic'}
+Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'} 
+${difficulty === 'Hard' ? 'CRITICAL: "Hard" questions MUST be tricky and test common misconceptions! Include highly plausible distractors that would fool a Year 6 student who isn\'t paying close attention.' : ''}
+Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any relevant topic from the official Cambridge Primary Checkpoint Year 6 Syllabus. DO NOT use the topic "Waves" (it is not Year 6).'}
 Vocabulary/Explanation Target Level: ${vocabLevel} - Ensure the explanation strictly matches this reading level.
 
 For Math and Science: If the question requires a visual diagram (e.g., a geometry shape, a bar chart, a science circuit, or a food web), YOU MUST provide it using safe, inline SVG code. It must be valid <svg>...</svg> format in the 'visual' field. DO NOT use Mermaid.js. If no visual is needed, leave it null.
@@ -201,7 +202,7 @@ Provide a reading comprehension passage (approx 200 words) and 5-7 questions wor
 Provide a writing prompt for a short story or report (150-200 words).
 
 If subject is MATH or SCIENCE:
-Provide a "structured scenario" (like an experiment context or data set) instead of a story passage, followed by 5-7 short-answer questions.
+Provide a "structured scenario" (like an experiment context or data set) instead of a story passage, followed by 5-7 short-answer questions. DO NOT use the topic "Waves" (it is not Year 6).
 Provide a longer "Extended Problem Solving / Investigation" prompt for the writing section.
 
 OUTPUT STRICTLY IN JSON FORMAT matching this exact interface:
