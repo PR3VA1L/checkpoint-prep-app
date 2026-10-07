@@ -19,5 +19,34 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
+
+    // 3. Users Collection (Profiles, linking, roles)
+    match /users/{userId} {
+      // Allow users to read and write their own profile
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow anyone logged in to query by linkingCode to link accounts
+      allow read: if request.auth != null; 
+      // Allow updating linkedParents or linkedStudents across accounts for linking
+      allow update: if request.auth != null; 
+      
+      // 4. Sessions Subcollection (Practice history)
+      match /sessions/{sessionId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        // Allow linked parents to read sessions
+        allow read: if request.auth != null && (
+          request.auth.uid == userId ||
+          request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.linkedParents
+        );
+      }
+
+      // 5. Progress Subcollection (If used instead of user_progress)
+      match /progress/{progressId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read: if request.auth != null && (
+          request.auth.uid == userId ||
+          request.auth.uid in get(/databases/$(database)/documents/users/$(userId)).data.linkedParents
+        );
+      }
+    }
   }
 }
