@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, limit } from 'firebase/firestore';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
 import { generateMCQQuestions } from './src/lib/gemini.js';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
@@ -20,7 +20,7 @@ async function testEndToEnd() {
   console.log("1. Generating questions via Gemini 3.5...");
   let generatedQuestions = [];
   try {
-    generatedQuestions = await generateMCQQuestions(["Grammar"], "Medium", 2);
+    generatedQuestions = await generateMCQQuestions("English", ["Grammar"], "Medium", 2);
     console.log(`Generated ${generatedQuestions.length} questions`);
   } catch (err) {
     console.error("Gemini failed:", err);

@@ -23,6 +23,7 @@ export default function WrittenPractice() {
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const startPractice = async () => {
     setIsGenerating(true);
@@ -31,6 +32,7 @@ export default function WrittenPractice() {
       setExamData(data);
       setIsSetupComplete(true);
       setFeedback(null);
+      setErrorMsg(null);
       setText('');
       setCompAnswers({});
       setOcrChunks([]);
@@ -74,6 +76,7 @@ export default function WrittenPractice() {
 
   const handleSubmit = async () => {
     setLoading(true);
+    setErrorMsg(null);
     try {
       let promptText = '';
       let submissionText = '';
@@ -93,8 +96,9 @@ export default function WrittenPractice() {
 
       const result = await gradeSubmission(promptText, submissionText, taskType === 'Comprehension' ? 'Comprehension' : 'Writing');
       setFeedback(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Grading failed", error);
+      setErrorMsg(error.message || "Failed to grade submission. The AI service may be overloaded or out of quota.");
     } finally {
       setLoading(false);
     }
@@ -217,6 +221,12 @@ export default function WrittenPractice() {
             </div>
 
             <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+              {errorMsg && (
+                <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '0.75rem', marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <AlertCircle size={20} />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
               <button className="btn btn-primary" onClick={handleSubmit} disabled={loading} style={{ width: '100%' }}>
                 {loading ? <Loader2 className="animate-spin" /> : 'Submit for Marking'}
               </button>
@@ -282,6 +292,13 @@ export default function WrittenPractice() {
                 ))}
               </div>
 
+              {errorMsg && (
+                <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '0.75rem', marginTop: '1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <AlertCircle size={20} />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || missingWords.some(w => w.trim() === '')} style={{ width: '100%', marginTop: '2rem' }}>
                 {loading ? <Loader2 className="animate-spin" /> : 'Confirm & Grade Essay'}
               </button>
@@ -316,6 +333,12 @@ export default function WrittenPractice() {
               {loading ? <Loader2 className="animate-spin" /> : 'Submit for Marking'}
             </button>
           </div>
+          {errorMsg && (
+            <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', borderRadius: '0.75rem', marginTop: '1.5rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <AlertCircle size={20} />
+              <span>{errorMsg}</span>
+            </div>
+          )}
         </div>
       )}
 

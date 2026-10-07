@@ -26,7 +26,7 @@ export function calculateNextReview(wasCorrect: boolean, currentProgress?: UserP
     easeFactor = easeFactor + 0.1; // Reward for correct
   } else {
     consecutiveCorrect = 0;
-    interval = 1; // Reset to tomorrow
+    interval = 0; // Reset to due immediately so it shows up for review today
     easeFactor = Math.max(1.3, easeFactor - 0.2); // Penalize, but never go below 1.3
   }
 

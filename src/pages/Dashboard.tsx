@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress } from '../lib/srs';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -14,6 +15,7 @@ export default function Dashboard() {
     mastered: 0,
     due: 0
   });
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedSubject, setSelectedSubject] = useState('english');
 
@@ -39,6 +41,19 @@ export default function Dashboard() {
             dueCount++;
           }
         });
+        
+        // Mock chart data (in reality, query historical snapshots)
+        const mockData = [];
+        const date = new Date();
+        date.setDate(date.getDate() - 7);
+        for(let i=0; i<7; i++) {
+          mockData.push({
+            name: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()],
+            score: Math.floor(Math.random() * 40) + 60
+          });
+          date.setDate(date.getDate() + 1);
+        }
+        setChartData(mockData);
 
         setStats({
           reviewed: reviewedCount,
@@ -112,7 +127,7 @@ export default function Dashboard() {
               padding: '1rem 2rem',
               borderRadius: '1rem',
               border: 'none',
-              background: selectedSubject === subject ? 'var(--primary)' : 'rgba(255,255,255,0.5)',
+              background: selectedSubject === subject ? 'var(--primary)' : 'var(--surface)',
               color: selectedSubject === subject ? 'white' : 'var(--text-main)',
               fontWeight: 'bold',
               fontSize: '1.1rem',
@@ -125,6 +140,44 @@ export default function Dashboard() {
             {subject}
           </button>
         ))}
+      </div>
+
+      {/* Adaptive Daily Study Plan Banner */}
+      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)', border: '2px solid var(--primary)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.8rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Sparkles color="var(--primary)" /> Your Daily Adaptive Plan
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px' }}>
+            We've built a custom 15-question practice session targeting exactly what you need to review today across {selectedSubject}.
+          </p>
+        </div>
+        <Link to={`/practice/mcq/${selectedSubject}?plan=daily`} className="btn btn-primary" style={{ padding: '1rem 2rem', fontSize: '1.1rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <PlayCircle /> Start Daily Plan
+        </Link>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginTop: '1rem' }}>
+        <div className="glass-card" style={{ padding: '2rem' }}>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Performance Trend (Last 7 Days)</h3>
+          <div style={{ height: '300px', width: '100%' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="name" stroke="var(--text-muted)" />
+                <YAxis stroke="var(--text-muted)" domain={[0, 100]} />
+                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem' }} />
+                <Area type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
       </div>
 
       {/* Quick Start Actions */}

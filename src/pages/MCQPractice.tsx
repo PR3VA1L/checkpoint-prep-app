@@ -4,9 +4,33 @@ import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { generateHint, generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { QUESTION_BANK } from '../data/questionBank';
+import confetti from 'canvas-confetti';
+
+const playPopSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.05);
+    
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+  } catch (e) {
+    // Ignore audio context errors
+  }
+};
 
 const SUBJECT_CATEGORIES: Record<string, Record<string, string[]>> = {
   english: {
@@ -30,6 +54,7 @@ const SUBJECT_CATEGORIES: Record<string, Record<string, string[]>> = {
 export default function MCQPractice() {
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const activeSubject = subject || 'english';
   const categoryObj = SUBJECT_CATEGORIES[activeSubject] || SUBJECT_CATEGORIES['english'];
 
@@ -85,6 +110,39 @@ export default function MCQPractice() {
       setSelectedTopics([...selectedTopics, topic]);
     }
   };
+
+  const startDailyPlan = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      // For now, simulate an adaptive plan by pulling 15 random questions from the subject
+      let qList = QUESTION_BANK.filter(q => q.subject === activeSubject);
+      qList = qList.sort(() => Math.random() - 0.5).slice(0, 15);
+      const formattedBank = qList.map(q => ({
+        ...q,
+        id: 'bank-' + Math.random().toString(36).substring(7)
+      }));
+      
+      setQuestions(formattedBank);
+      setIsSetupComplete(true);
+      setIsFinished(false);
+      setUserAnswers({});
+      setCurrentIndex(0);
+      setSelected(null);
+      setIsChecked(false);
+      setCurrentHint(null);
+    } catch (err) {
+      setErrorMsg('Failed to start daily plan.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (location.search.includes('plan=daily')) {
+      startDailyPlan();
+    }
+  }, [location.search, activeSubject]);
 
 
   const startPractice = async () => {
@@ -475,6 +533,11 @@ export default function MCQPractice() {
         setIsChecked(true);
         
         if (isCorrect) {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
           const newStreak = streak + 1;
           setStreak(newStreak);
           if (newStreak >= 3 && newStreak % 2 !== 0) { // Trigger at 3, 5, 7, 9...
@@ -636,6 +699,11 @@ export default function MCQPractice() {
       </div>
 
       <div className="glass-card" style={{ padding: '2.5rem' }}>
+        {currentQuestion.imageUrl && (
+          <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+            <img src={currentQuestion.imageUrl} alt="Question Diagram" style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '0.5rem', objectFit: 'contain' }} />
+          </div>
+        )}
         <p style={{ fontSize: '1.25rem', marginBottom: '2rem', fontWeight: '500', whiteSpace: 'pre-wrap' }}>
           {currentQuestion.question}
         </p>
@@ -671,7 +739,12 @@ export default function MCQPractice() {
             return (
               <button
                 key={idx}
-                onClick={() => !isChecked && setSelected(idx)}
+                onClick={() => {
+                  if (!isChecked) {
+                    playPopSound();
+                    setSelected(idx);
+                  }
+                }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

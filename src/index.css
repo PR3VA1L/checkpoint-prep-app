@@ -26,6 +26,23 @@
   --shadow-glow: 0 0 15px rgba(99, 102, 241, 0.3);
 }
 
+[data-theme='dark'] {
+  --primary: #818cf8;
+  --primary-hover: #6366f1;
+  --primary-light: rgba(99, 102, 241, 0.2);
+  
+  --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+  --surface: rgba(30, 41, 59, 0.7);
+  --surface-solid: #1e293b;
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  
+  --border: rgba(255, 255, 255, 0.1);
+  --shadow-glow: 0 0 20px rgba(129, 140, 248, 0.5);
+}
+
+
 * {
   box-sizing: border-box;
   margin: 0;

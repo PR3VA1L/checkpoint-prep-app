@@ -1,11 +1,23 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { BookOpen, PenTool, Home, Award, LogOut } from 'lucide-react';
+import { BookOpen, PenTool, Home, Award, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import FloatingCalculator from './FloatingCalculator';
 
 export default function Layout() {
   const location = useLocation();
   const { user, logout } = useAuth();
+  
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   const currentSubject = location.pathname.split('/')[3] || 'english';
 
@@ -65,6 +77,20 @@ export default function Layout() {
               </p>
             </div>
           )}
+          
+          <button 
+            onClick={toggleTheme}
+            style={{
+              width: '100%', padding: '0.75rem', borderRadius: '0.75rem',
+              border: '1px solid var(--border)', background: 'var(--surface)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: '0.5rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.875rem',
+              transition: 'all 0.2s', marginBottom: '1rem'
+            }}
+          >
+            {theme === 'light' ? <><Moon size={16} /> Dark Mode</> : <><Sun size={16} /> Light Mode</>}
+          </button>
+
           <button 
             onClick={logout}
             style={{

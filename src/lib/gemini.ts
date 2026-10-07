@@ -1,14 +1,15 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+// @ts-ignore - process is injected in Node environment
+const apiKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
 
 if (!apiKey) {
   console.warn("Missing Gemini API Key in .env.local");
 }
 
 const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
-export const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+export const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
 const WRITING_SYSTEM_PROMPT = `
 You are a highly pedantic, rigorous Cambridge Primary Checkpoint Examiner (0058/0844/0096/0097). 
@@ -221,9 +222,9 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 
     const result = await model.generateContent(prompt);
     let text = result.response.text().trim();
-    if (text.startsWith('\`\`\`json')) text = text.slice(7);
-    if (text.startsWith('\`\`\`')) text = text.slice(3);
-    if (text.endsWith('\`\`\`')) text = text.slice(0, -3);
+    if (text.startsWith('```json')) text = text.slice(7);
+    if (text.startsWith('```')) text = text.slice(3);
+    if (text.endsWith('```')) text = text.slice(0, -3);
     
     return JSON.parse(text.trim());
   } catch (error) {
