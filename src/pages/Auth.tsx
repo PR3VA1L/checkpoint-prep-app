@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth, googleProvider } from '../lib/firebase';
-import { Loader2, Mail, Lock } from 'lucide-react';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, getAdditionalUserInfo } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, googleProvider, db } from '../lib/firebase';
+import { Loader2, Mail, Lock, User, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'student' | 'parent'>('student');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -17,7 +19,18 @@ export default function Auth() {
     try {
       setLoading(true);
       setErrorMsg('');
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      const additionalInfo = getAdditionalUserInfo(result);
+      if (additionalInfo?.isNewUser || !isLogin) {
+        // It's a new user, or they explicitly selected sign up
+        const docRef = doc(db, 'users', result.user.uid);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          await setDoc(docRef, { role: role });
+        }
+      }
+      
       navigate('/');
     } catch (error: any) {
       console.error(error);
@@ -35,7 +48,8 @@ export default function Auth() {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, 'users', result.user.uid), { role: role });
       }
       navigate('/');
     } catch (error: any) {
@@ -74,6 +88,35 @@ export default function Auth() {
         {errorMsg && (
           <div style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', padding: '0.75rem', borderRadius: '0.75rem', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
             {errorMsg}
+          </div>
+        )}
+
+        {!isLogin && (
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+            <button
+              onClick={() => setRole('student')}
+              style={{
+                flex: 1, padding: '1rem', borderRadius: '1rem', border: `2px solid ${role === 'student' ? 'var(--primary)' : 'var(--border)'}`,
+                background: role === 'student' ? 'var(--primary-light)' : 'transparent',
+                color: role === 'student' ? 'var(--primary)' : 'var(--text-muted)',
+                fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+            >
+              <User size={24} />
+              I am a Student
+            </button>
+            <button
+              onClick={() => setRole('parent')}
+              style={{
+                flex: 1, padding: '1rem', borderRadius: '1rem', border: `2px solid ${role === 'parent' ? 'var(--primary)' : 'var(--border)'}`,
+                background: role === 'parent' ? 'var(--primary-light)' : 'transparent',
+                color: role === 'parent' ? 'var(--primary)' : 'var(--text-muted)',
+                fontWeight: 'bold', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', transition: 'all 0.2s'
+              }}
+            >
+              <Users size={24} />
+              I am a Parent
+            </button>
           </div>
         )}
 

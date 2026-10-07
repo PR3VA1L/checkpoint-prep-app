@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress } from '../lib/srs';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const [generatingCode, setGeneratingCode] = useState(false);
   
   const [stats, setStats] = useState({
     reviewed: 0,
@@ -70,6 +71,23 @@ export default function Dashboard() {
     fetchProgress();
   }, [user]);
 
+  const generateLinkCode = async () => {
+    if (!user) return;
+    setGeneratingCode(true);
+    try {
+      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      await updateDoc(doc(db, 'users', user.uid), {
+        linkingCode: newCode
+      });
+      await refreshProfile();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to generate code.");
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', paddingBottom: '4rem' }}>
       <header>
@@ -115,6 +133,29 @@ export default function Dashboard() {
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Due for Review</p>
           </div>
         </div>
+      </div>
+
+      <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
+        <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Target size={18} color="var(--primary)" /> Parent Linking
+        </h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+          Allow your parents to track your progress by giving them this code.
+        </p>
+        {profile?.linkingCode ? (
+          <div style={{ padding: '1rem', background: 'var(--surface)', borderRadius: '0.75rem', border: '1px dashed var(--border)', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', letterSpacing: '2px' }}>
+            {profile.linkingCode}
+          </div>
+        ) : (
+          <button 
+            onClick={generateLinkCode}
+            disabled={generatingCode}
+            className="btn"
+            style={{ width: '100%', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.75rem' }}
+          >
+            {generatingCode ? 'Generating...' : 'Generate Code'}
+          </button>
+        )}
       </div>
 
       {/* Subject Selector */}
@@ -203,12 +244,12 @@ export default function Dashboard() {
             <div className="animate-float" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--secondary)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1rem', animationDelay: '1s' }}>
               <Star size={48} />
             </div>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Written Tasks & OCR</h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{selectedSubject === 'english' ? 'Written Tasks & OCR' : 'Structured Questions & OCR'}</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Write or upload handwritten tasks, graded instantly by AI.
+              {selectedSubject === 'english' ? 'Write or upload handwritten tasks, graded instantly by AI.' : 'Solve problems or upload working, graded instantly by AI.'}
             </p>
             <Link to={`/practice/written/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
-              Start Writing
+              {selectedSubject === 'english' ? 'Start Writing' : 'Start Paper'}
             </Link>
           </div>
 

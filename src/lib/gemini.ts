@@ -187,8 +187,8 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 
 export async function generateMockExam(subject: string) {
   if (!apiKey) {
-    console.warn("API key missing. Falling back to local mock exam.");
-    return MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
+    const fallback = MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
+    return Array.isArray(fallback) ? fallback[Math.floor(Math.random() * fallback.length)] : fallback;
   }
   
   try {
@@ -229,6 +229,7 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
     return JSON.parse(text.trim());
   } catch (error) {
     console.error("Failed to generate exam dynamically, falling back to local:", error);
-    return MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
+    const fallback = MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
+    return Array.isArray(fallback) ? fallback[Math.floor(Math.random() * fallback.length)] : fallback;
   }
 }

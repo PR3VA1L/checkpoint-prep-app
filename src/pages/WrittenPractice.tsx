@@ -2,11 +2,15 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { extractHandwritingOCR, gradeSubmission, generateMockExam } from '../lib/gemini';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 
 export default function WrittenPractice() {
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const activeSubject = subject || 'english';
   const [taskType, setTaskType] = useState<string>('Writing');
   const [isSetupComplete, setIsSetupComplete] = useState(false);
@@ -24,12 +28,14 @@ export default function WrittenPractice() {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<number>(0);
 
   const startPractice = async () => {
     setIsGenerating(true);
     try {
       const data = await generateMockExam(activeSubject);
       setExamData(data);
+      setStartTime(Date.now());
       setIsSetupComplete(true);
       setFeedback(null);
       setErrorMsg(null);
@@ -96,6 +102,20 @@ export default function WrittenPractice() {
 
       const result = await gradeSubmission(promptText, submissionText, taskType === 'Comprehension' ? 'Comprehension' : 'Writing');
       setFeedback(result);
+
+      if (user) {
+        const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
+        const sessionRef = collection(db, 'users', user.uid, 'sessions');
+        addDoc(sessionRef, {
+          subject: activeSubject,
+          type: taskType === 'Comprehension' ? 'Structured Questions' : 'Extended Task',
+          score: result.marksAwarded,
+          total: result.maxMarks,
+          timestamp: Timestamp.now(),
+          durationSeconds,
+          topics: ['Written Practice']
+        }).catch(console.error);
+      }
     } catch (error: any) {
       console.error("Grading failed", error);
       setErrorMsg(error.message || "Failed to grade submission. The AI service may be overloaded or out of quota.");
@@ -147,8 +167,10 @@ export default function WrittenPractice() {
                 fontWeight: 'bold', fontSize: '1.1rem'
               }}
             >
-              Full Writing Task
-              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.5rem' }}>(Type an essay or story)</span>
+              {activeSubject === 'english' ? 'Full Writing Task' : 'Extended Problem Solving'}
+              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.5rem' }}>
+                {activeSubject === 'english' ? '(Type an essay or story)' : '(Explain your full reasoning)'}
+              </span>
             </button>
             <button 
               onClick={() => setTaskType('Comprehension')}
@@ -159,8 +181,10 @@ export default function WrittenPractice() {
                 fontWeight: 'bold', fontSize: '1.1rem'
               }}
             >
-              Full Comprehension Task
-              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.5rem' }}>(Read passage & answer questions)</span>
+              {activeSubject === 'english' ? 'Full Comprehension Task' : 'Structured Paper Questions'}
+              <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal', marginTop: '0.5rem' }}>
+                {activeSubject === 'english' ? '(Read passage & answer questions)' : '(Solve short-answer questions)'}
+              </span>
             </button>
             <button 
               onClick={() => setTaskType('Upload')}
@@ -188,16 +212,18 @@ export default function WrittenPractice() {
     <div style={{ maxWidth: taskType === 'Comprehension' ? '1200px' : '800px', margin: '0 auto' }}>
       
       {taskType === 'Comprehension' ? (
-        <div className="responsive-flex">
-          {/* Left Column: Passage */}
-          <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem' }}>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData.comprehension.title}</h2>
-            <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
-              {examData.comprehension.passage}
+        <div className={activeSubject === 'english' ? "responsive-flex" : ""} style={activeSubject !== 'english' ? { display: 'flex', flexDirection: 'column', gap: '2rem' } : undefined}>
+          {/* Passage / Scenario block */}
+          {examData.comprehension.passage && (
+            <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem' }}>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData.comprehension.title}</h2>
+              <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                {examData.comprehension.passage}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Right Column: Questions */}
+          {/* Right Column / Bottom Column: Questions */}
           <div className="glass-card scrollable-panel" style={{ flex: 1, padding: '2rem', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>
               {examData.comprehension.questions.map((q: any) => (
@@ -239,7 +265,7 @@ export default function WrittenPractice() {
         <div className="glass-card" style={{ padding: '2.5rem' }}>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Upload Handwritten Practice</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Prompt: <strong>{examData?.writing?.instructions || "Write your essay here."}</strong>
+            Prompt: <strong>{examData?.writing?.instructions || (activeSubject === 'english' ? "Write your essay here." : "Show your working here.")}</strong>
           </p>
 
           {ocrChunks.length === 0 ? (
@@ -252,7 +278,7 @@ export default function WrittenPractice() {
               ) : (
                 <>
                   <Upload size={40} color="var(--text-muted)" style={{ margin: '0 auto 1rem auto' }} />
-                  <h3 style={{ marginBottom: '0.5rem' }}>Take a photo of your essay</h3>
+                  <h3 style={{ marginBottom: '0.5rem' }}>{activeSubject === 'english' ? 'Take a photo of your essay' : 'Take a photo of your work'}</h3>
                   <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>Ensure the lighting is good and the writing is clear.</p>
                   <input type="file" accept="image/*" onChange={handleFileUpload} id="handwriting-upload" style={{ display: 'none' }} />
                   <label htmlFor="handwriting-upload" className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-block' }}>
@@ -300,7 +326,7 @@ export default function WrittenPractice() {
               )}
 
               <button className="btn btn-primary" onClick={handleSubmit} disabled={loading || missingWords.some(w => w.trim() === '')} style={{ width: '100%', marginTop: '2rem' }}>
-                {loading ? <Loader2 className="animate-spin" /> : 'Confirm & Grade Essay'}
+                {loading ? <Loader2 className="animate-spin" /> : (activeSubject === 'english' ? 'Confirm & Grade Essay' : 'Confirm & Grade Work')}
               </button>
             </div>
           )}
@@ -309,9 +335,9 @@ export default function WrittenPractice() {
       ) : (
 
         <div className="glass-card" style={{ padding: '2.5rem' }}>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Writing Task</h2>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>{activeSubject === 'english' ? 'Writing Task' : 'Problem Solving Task'}</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Prompt: <strong>{examData?.writing?.instructions || "Write your essay here."}</strong>
+            Prompt: <strong>{examData?.writing?.instructions || (activeSubject === 'english' ? "Write your essay here." : "Show your working here.")}</strong>
           </p>
 
           <textarea

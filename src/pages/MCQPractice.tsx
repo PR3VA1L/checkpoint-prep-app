@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, Loader2, Settings2, Lightbulb } from 'lucide-react';
-import { collection, getDocs, query, where, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { generateHint, generateMCQQuestions } from '../lib/gemini';
+import { generateMCQQuestions } from '../lib/gemini';
 import { saveQuestionProgress } from '../lib/srs';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -84,6 +84,7 @@ export default function MCQPractice() {
   // Practice State
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [startTime, setStartTime] = useState<number>(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [isChecked, setIsChecked] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -91,7 +92,6 @@ export default function MCQPractice() {
 
   // Hint State
   const [currentHint, setCurrentHint] = useState<string | null>(null);
-  const [isFetchingHint, setIsFetchingHint] = useState(false);
   const [usedHint, setUsedHint] = useState(false);
   
   // Score Screen State
@@ -115,15 +115,46 @@ export default function MCQPractice() {
     setLoading(true);
     setErrorMsg('');
     try {
-      // For now, simulate an adaptive plan by pulling 15 random questions from the subject
+      let progressIds = new Set<string>();
+      if (user) {
+        try {
+          const snapshot = await getDocs(collection(db, 'users', user.uid, 'progress'));
+          snapshot.forEach(doc => {
+            // Include heavily seen questions so we skip them
+            if (doc.data().consecutiveCorrect > 1 || doc.data().interval > 1) {
+              progressIds.add(doc.id.replace(`${user.uid}_`, ''));
+            }
+          });
+        } catch (e) {
+          console.error('Failed to get progress', e);
+        }
+      }
+
       let qList = QUESTION_BANK.filter(q => q.subject === activeSubject);
-      qList = qList.sort(() => Math.random() - 0.5).slice(0, 15);
-      const formattedBank = qList.map(q => ({
-        ...q,
-        id: 'bank-' + Math.random().toString(36).substring(7)
-      }));
       
-      setQuestions(formattedBank);
+      const formattedBank = qList.map(q => {
+        let hash = 0;
+        for (let i = 0; i < q.question.length; i++) {
+          hash = (hash << 5) - hash + q.question.charCodeAt(i);
+          hash &= hash;
+        }
+        return {
+          ...q,
+          id: 'bank-' + Math.abs(hash).toString(36)
+        };
+      });
+
+      // Filter out seen ones if we have enough
+      let unseen = formattedBank.filter(q => !progressIds.has(q.id));
+      if (unseen.length < 15) {
+        // Fallback to all if we run out of unseen
+        unseen = formattedBank;
+      }
+
+      const selectedQuestions = unseen.sort(() => Math.random() - 0.5).slice(0, 15);
+      
+      setQuestions(selectedQuestions);
+      setStartTime(Date.now());
       setIsSetupComplete(true);
       setIsFinished(false);
       setUserAnswers({});
@@ -195,11 +226,18 @@ export default function MCQPractice() {
         const needed = questionCount - qList.length;
         const selectedFromBank = bankQuestions.sort(() => Math.random() - 0.5).slice(0, needed);
         
-        // Add fake IDs to bank questions
-        const formattedBank = selectedFromBank.map(q => ({
-          ...q,
-          id: 'bank-' + Math.random().toString(36).substring(7)
-        }));
+        // Add stable IDs to bank questions
+        const formattedBank = selectedFromBank.map(q => {
+          let hash = 0;
+          for (let i = 0; i < q.question.length; i++) {
+            hash = (hash << 5) - hash + q.question.charCodeAt(i);
+            hash &= hash;
+          }
+          return {
+            ...q,
+            id: 'bank-' + Math.abs(hash).toString(36)
+          };
+        });
         
         qList = [...qList, ...formattedBank];
       }
@@ -237,6 +275,7 @@ export default function MCQPractice() {
       qList = qList.sort(() => Math.random() - 0.5).slice(0, questionCount);
 
       setQuestions(qList);
+      setStartTime(Date.now());
       setIsSetupComplete(true);
       setIsFinished(false);
       setUserAnswers({});
@@ -254,12 +293,10 @@ export default function MCQPractice() {
   };
 
   const fetchHint = async () => {
-    if (!questions[currentIndex] || isFetchingHint || currentHint) return;
-    setIsFetchingHint(true);
+    if (!questions[currentIndex] || currentHint) return;
     setUsedHint(true);
-    const hint = await generateHint(questions[currentIndex].question, questions[currentIndex].options, vocabLevel);
-    setCurrentHint(hint);
-    setIsFetchingHint(false);
+    const q = questions[currentIndex];
+    setCurrentHint(q.hint || `Focus on the core concept of ${q.topic}. Look carefully at the options and try to eliminate the ones that clearly don't make sense in this context.`);
   };
 
   if (!isSetupComplete) {
@@ -560,6 +597,21 @@ export default function MCQPractice() {
       setCurrentIndex(currentIndex + 1);
     } else {
       setIsFinished(true);
+      // Save session history
+      if (user) {
+        const score = questions.filter(q => userAnswers[q.id] === q.correctIndex).length;
+        const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
+        const sessionRef = collection(db, 'users', user.uid, 'sessions');
+        addDoc(sessionRef, {
+          subject: activeSubject,
+          type: isTestMode ? 'Mock Exam' : 'Practice',
+          score,
+          total: questions.length,
+          timestamp: Timestamp.now(),
+          durationSeconds,
+          topics: selectedTopics.length > 0 ? selectedTopics : ['Daily Mix']
+        }).catch(console.error);
+      }
     }
   };
 
@@ -793,14 +845,14 @@ export default function MCQPractice() {
             {!isChecked && allowHints && !isTestMode && (
               <button 
                 onClick={fetchHint} 
-                disabled={isFetchingHint || currentHint !== null}
+                disabled={currentHint !== null}
                 style={{ 
                   background: 'none', border: 'none', color: '#ca8a04', cursor: currentHint ? 'default' : 'pointer', 
                   display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', fontSize: '1rem',
-                  opacity: (isFetchingHint || currentHint) ? 0.5 : 1 
+                  opacity: currentHint ? 0.5 : 1 
                 }}
               >
-                {isFetchingHint ? <Loader2 className="animate-spin" size={20} /> : <Lightbulb size={20} />}
+                <Lightbulb size={20} />
                 Ask for a Hint (-0.5 pts)
               </button>
             )}

@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { BookOpen, PenTool, Home, Award, LogOut, Moon, Sun, History } from 'lucide-react';
+import { Users, LayoutDashboard, LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import FloatingCalculator from './FloatingCalculator';
 
-export default function Layout() {
+export default function ParentLayout() {
   const location = useLocation();
   const { user, logout } = useAuth();
   
@@ -19,13 +18,8 @@ export default function Layout() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
-  const currentSubject = location.pathname.split('/')[3] || 'english';
-
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: Home },
-    { path: `/practice/mcq/${currentSubject}`, match: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
-    { path: `/practice/written/${currentSubject}`, match: '/practice/written', label: 'Written Tasks', icon: PenTool },
-    { path: '/history', label: 'History', icon: History },
+    { path: '/parent/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   ];
 
   return (
@@ -34,14 +28,14 @@ export default function Layout() {
       <aside style={{ width: '250px', padding: '2rem 1rem', display: 'flex', flexDirection: 'column' }} className="glass">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '3rem', padding: '0 1rem' }}>
           <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
-            <Award size={24} />
+            <Users size={24} />
           </div>
-          <h2 style={{ fontSize: '1.25rem', margin: 0 }} className="text-gradient">Checkpoint Prep</h2>
+          <h2 style={{ fontSize: '1.25rem', margin: 0 }} className="text-gradient">Parent Portal</h2>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           {navItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.match && location.pathname.startsWith(item.match));
+            const isActive = location.pathname === item.path || (item.path !== '/parent/dashboard' && location.pathname.startsWith(item.path));
             const Icon = item.icon;
             
             return (
@@ -72,9 +66,9 @@ export default function Layout() {
         <div style={{ marginTop: 'auto', padding: '1rem' }}>
           {user && (
             <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Signed in as</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Parent Account</p>
               <p style={{ fontSize: '0.875rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.displayName || user.email || 'Student'}
+                {user.displayName || user.email || 'Parent'}
               </p>
             </div>
           )}
@@ -113,11 +107,6 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
-
-      {/* Conditionally render calculator for math and science */}
-      {(location.pathname.includes('/math') || location.pathname.includes('/science')) && (
-        <FloatingCalculator />
-      )}
     </div>
   );
 }
