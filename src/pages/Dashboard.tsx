@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, Timestamp, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress } from '../lib/srs';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -43,18 +43,42 @@ export default function Dashboard() {
           }
         });
         
-        // Mock chart data (in reality, query historical snapshots)
-        const mockData = [];
+        // Real chart data from sessions
+        const sessionsRef = collection(db, 'users', user.uid, 'sessions');
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const sessionsQuery = query(sessionsRef, where('timestamp', '>=', Timestamp.fromDate(weekAgo)));
+        const sessionsSnap = await getDocs(sessionsQuery);
+        
+        const dayScores: Record<string, { score: number, total: number }> = {};
         const date = new Date();
-        date.setDate(date.getDate() - 7);
+        date.setDate(date.getDate() - 6);
         for(let i=0; i<7; i++) {
-          mockData.push({
-            name: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()],
-            score: Math.floor(Math.random() * 40) + 60
-          });
+          const name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+          dayScores[name] = { score: 0, total: 0 };
           date.setDate(date.getDate() + 1);
         }
-        setChartData(mockData);
+
+        sessionsSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.timestamp) {
+            const d = data.timestamp.toDate();
+            const name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+            if (dayScores[name] && typeof data.score === 'number' && typeof data.total === 'number') {
+              dayScores[name].score += data.score;
+              dayScores[name].total += data.total;
+            }
+          }
+        });
+
+        const realChartData = Object.keys(dayScores).map(name => {
+          const s = dayScores[name];
+          return {
+            name,
+            score: s.total > 0 ? Math.round((s.score / s.total) * 100) : null
+          };
+        });
+        setChartData(realChartData);
 
         setStats({
           reviewed: reviewedCount,
@@ -76,6 +100,12 @@ export default function Dashboard() {
     setGeneratingCode(true);
     try {
       const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+      // Store the link code in a dedicated collection
+      await setDoc(doc(db, 'link_codes', newCode), {
+        studentId: user.uid,
+        expiresAt: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)) // 24 hours
+      });
+      // Also store it on the user profile for UI display if needed
       await setDoc(doc(db, 'users', user.uid), {
         linkingCode: newCode
       }, { merge: true });

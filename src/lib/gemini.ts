@@ -1,15 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from './firebase';
 import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
-// @ts-ignore - process is injected in Node environment
-const apiKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_GEMINI_API_KEY : (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '');
-
-if (!apiKey) {
-  console.warn("Missing Gemini API Key in .env.local");
-}
-
-const genAI = new GoogleGenerativeAI(apiKey || 'placeholder');
-export const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+const functions = getFunctions(app);
+const geminiProxy = httpsCallable(functions, 'geminiProxy');
 
 const WRITING_SYSTEM_PROMPT = `
 You are a highly pedantic, rigorous Cambridge Primary Checkpoint Examiner (0058/0844/0096/0097). 
@@ -59,22 +53,12 @@ Your response MUST be in raw JSON format matching this exact structure:
 `;
 
 export async function gradeSubmission(promptText: string, studentSubmission: string, taskType: 'Writing' | 'Comprehension' = 'Writing') {
-  if (!apiKey) throw new Error("Gemini API key is missing. Please configure your .env.local file.");
-  
   try {
     const systemPrompt = taskType === 'Writing' ? WRITING_SYSTEM_PROMPT : COMPREHENSION_SYSTEM_PROMPT;
-    
-    const chat = model.startChat({
-      history: [
-        { role: "user", parts: [{ text: systemPrompt }] },
-        { role: "model", parts: [{ text: "Understood. I will act as the Cambridge Examiner and only output raw JSON." }] }
-      ],
-      generationConfig: { temperature: 0.2 }
-    });
-
     const msg = `TASK/PROMPT:\n${promptText}\n\nSTUDENT SUBMISSION:\n${studentSubmission}`;
-    const result = await chat.sendMessage(msg);
-    const response = result.response.text();
+    
+    const result = await geminiProxy({ prompt: msg, systemPrompt }) as { data: { text: string } };
+    const response = result.data.text;
     
     const cleanedJSON = response.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanedJSON);
@@ -86,7 +70,6 @@ export async function gradeSubmission(promptText: string, studentSubmission: str
 }
 
 export async function generateHint(question: string, options: string[], vocabLevel: string = 'Standard (11-year-old)') {
-  if (!apiKey) return "API key missing! Please configure your .env.local to enable AI hints.";
   try {
     const prompt = `
 You are an encouraging AI Tutor for an 11-year-old student preparing for the Cambridge Primary Checkpoint.
@@ -97,8 +80,8 @@ Options: ${options.join(', ')}
 Provide a very short, 1-2 sentence "Socratic hint" that guides them towards the right concept without giving away the answer. Do NOT tell them which option is correct. Keep it fun and encouraging.
 Adjust your vocabulary strictly to this level: ${vocabLevel}
     `;
-    const result = await model.generateContent(prompt);
-    return result.response.text().trim();
+    const result = await geminiProxy({ prompt }) as { data: { text: string } };
+    return result.data.text.trim();
   } catch (error) {
     console.error("Error generating hint:", error);
     return "Hm, I'm having trouble thinking of a hint right now. Look closely at the wording of the question!";
@@ -106,12 +89,7 @@ Adjust your vocabulary strictly to this level: ${vocabLevel}
 }
 
 export async function extractHandwritingOCR(base64Image: string) {
-  if (!apiKey) throw new Error("Gemini API key is missing. Please configure your .env.local file to use OCR.");
   try {
-    // Strip out the data URL prefix if present (e.g., "data:image/jpeg;base64,")
-    const base64Data = base64Image.split(',')[1] || base64Image;
-    const mimeType = base64Image.split(';')[0].split(':')[1] || 'image/jpeg';
-
     const prompt = `
 You are an expert handwriting transcription AI. 
 Read the handwritten text in this image and transcribe it exactly as written.
@@ -120,17 +98,8 @@ If a word is too messy or completely illegible to read confidently, replace that
 Return ONLY the transcribed text.
     `;
 
-    const imageParts = [
-      {
-        inlineData: {
-          data: base64Data,
-          mimeType
-        }
-      }
-    ];
-
-    const result = await model.generateContent([prompt, ...imageParts]);
-    return result.response.text().trim();
+    const result = await geminiProxy({ prompt, imageBase64: base64Image }) as { data: { text: string } };
+    return result.data.text.trim();
   } catch (error) {
     console.error("Error extracting handwriting:", error);
     throw new Error("Failed to read the handwriting. Please try a clearer picture.");
@@ -138,14 +107,12 @@ Return ONLY the transcribed text.
 }
 
 export async function generateMCQQuestions(subject: string, topics: string[], difficulty: string, count: number = 5, vocabLevel: string = 'Standard (11-year-old)') {
-  if (!apiKey) throw new Error("API key missing. Cannot generate questions dynamically.");
-  
   try {
     const prompt = `
 You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
 Generate exactly ${count} multiple-choice questions for year 6 students.
 Difficulty Level: ${difficulty !== 'All' ? difficulty : 'Mixed'} 
-${difficulty === 'Hard' ? 'CRITICAL: "Hard" questions MUST be tricky and test common misconceptions! Include highly plausible distractors that would fool a Year 6 student who isn\'t paying close attention.' : ''}
+${difficulty === 'Hard' ? 'CRITICAL: "Hard" questions MUST be tricky and test common misconceptions! Include highly plausible distractors that would fool a Year 6 student who is not paying close attention.' : ''}
 Topics Allowed: ${topics.length > 0 ? topics.join(', ') : 'Any relevant topic from the official Cambridge Primary Checkpoint Year 6 Syllabus. DO NOT use the topic "Waves" (it is not Year 6).'}
 Vocabulary/Explanation Target Level: ${vocabLevel} - Ensure the explanation strictly matches this reading level.
 
@@ -170,8 +137,8 @@ OUTPUT STRICTLY IN JSON FORMAT matching this TypeScript interface exactly, nothi
 
 Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
+    const result = await geminiProxy({ prompt }) as { data: { text: string } };
+    let text = result.data.text.trim();
     
     // Clean up potential markdown formatting if model misbehaves
     if (text.startsWith('\`\`\`json')) text = text.slice(7);
@@ -187,11 +154,6 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 }
 
 export async function generateMockExam(subject: string) {
-  if (!apiKey) {
-    const fallback = MOCK_EXAM_BANK[subject] || MOCK_EXAM_BANK['english'];
-    return Array.isArray(fallback) ? fallback[Math.floor(Math.random() * fallback.length)] : fallback;
-  }
-  
   try {
     const prompt = `
 You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
@@ -227,11 +189,11 @@ OUTPUT STRICTLY IN JSON FORMAT matching this exact interface:
 
 Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
 
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    if (text.startsWith('```json')) text = text.slice(7);
-    if (text.startsWith('```')) text = text.slice(3);
-    if (text.endsWith('```')) text = text.slice(0, -3);
+    const result = await geminiProxy({ prompt }) as { data: { text: string } };
+    let text = result.data.text.trim();
+    if (text.startsWith('\`\`\`json')) text = text.slice(7);
+    if (text.startsWith('\`\`\`')) text = text.slice(3);
+    if (text.endsWith('\`\`\`')) text = text.slice(0, -3);
     
     return JSON.parse(text.trim());
   } catch (error) {
@@ -240,3 +202,4 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
     return Array.isArray(fallback) ? fallback[Math.floor(Math.random() * fallback.length)] : fallback;
   }
 }
+

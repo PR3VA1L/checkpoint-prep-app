@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { doc, collection, query, where, getDocs, Timestamp, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc, arrayUnion } from 'firebase/firestore';
 import { Loader2, Clock, TrendingUp, AlertTriangle, Link as LinkIcon, BookOpen, PenTool } from 'lucide-react';
 
 export default function ParentDashboard() {
@@ -88,29 +88,32 @@ export default function ParentDashboard() {
     setLinking(true);
     setLinkError('');
     try {
-      // Find the user with this linking code
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('linkingCode', '==', linkCode.toUpperCase()));
-      const snap = await getDocs(q);
+      // Find the user with this linking code in link_codes
+      const linkDocRef = doc(db, 'link_codes', linkCode.toUpperCase());
+      const snap = await getDoc(linkDocRef);
       
-      if (snap.empty) {
+      if (!snap.exists()) {
         setLinkError('Invalid linking code. Please check the student dashboard.');
         setLinking(false);
         return;
       }
       
-      const studentDoc = snap.docs[0];
-      const studentUid = studentDoc.id;
+      const linkData = snap.data();
+      if (linkData.expiresAt && linkData.expiresAt.toMillis() < Date.now()) {
+        setLinkError('This linking code has expired. Please generate a new one.');
+        setLinking(false);
+        return;
+      }
+      
+      const studentUid = linkData.studentId;
       
       // Update parent document
       await updateDoc(doc(db, 'users', user.uid), {
         linkedStudents: arrayUnion(studentUid)
       });
       
-      // Update student document (optional but good for tracking)
-      await updateDoc(doc(db, 'users', studentUid), {
-        linkedParents: arrayUnion(user.uid)
-      });
+      // We no longer update the student document due to security rules preventing it.
+      // The session rules now use the parent's linkedStudents array.
       
       await refreshProfile();
       setLinkCode('');

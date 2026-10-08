@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, ArrowRight, Loader2, Settings2, Lightbulb } from 'lucide-react';
 import { collection, getDocs, query, where, addDoc, Timestamp } from 'firebase/firestore';
@@ -117,15 +118,18 @@ export default function MCQPractice() {
     setLoading(true);
     setErrorMsg('');
     try {
+      let dueQuestionIds = new Set<string>();
       let progressIds = new Set<string>();
       if (user) {
         try {
           const progressQuery = query(collection(db, 'user_progress'), where('userId', '==', user.uid));
           const snapshot = await getDocs(progressQuery);
+          const now = Date.now();
           snapshot.forEach(doc => {
-            // Include heavily seen questions so we skip them
-            if (doc.data().consecutiveCorrect > 0 || doc.data().interval > 0) {
-              progressIds.add(doc.data().questionId);
+            const data = doc.data();
+            progressIds.add(data.questionId);
+            if (data.nextReviewDate && data.nextReviewDate.toMillis() <= now) {
+              dueQuestionIds.add(data.questionId);
             }
           });
         } catch (e) {
@@ -147,14 +151,27 @@ export default function MCQPractice() {
         };
       });
 
-      // Filter out seen ones if we have enough
+      let dueQuestions = formattedBank.filter(q => dueQuestionIds.has(q.id));
       let unseen = formattedBank.filter(q => !progressIds.has(q.id));
-      if (unseen.length < 15) {
-        // Fallback to all if we run out of unseen
-        unseen = formattedBank;
+      
+      let selectedQuestions = [];
+      // Take up to 7 due questions
+      selectedQuestions.push(...dueQuestions.sort(() => Math.random() - 0.5).slice(0, 7));
+      
+      // Fill remaining with unseen
+      const remainingSlots = 15 - selectedQuestions.length;
+      if (remainingSlots > 0) {
+        selectedQuestions.push(...unseen.sort(() => Math.random() - 0.5).slice(0, remainingSlots));
+      }
+      
+      // If still not 15, fallback to anything
+      if (selectedQuestions.length < 15) {
+        const selectedIds = new Set(selectedQuestions.map(q => q.id));
+        const filler = formattedBank.filter(q => !selectedIds.has(q.id));
+        selectedQuestions.push(...filler.sort(() => Math.random() - 0.5).slice(0, 15 - selectedQuestions.length));
       }
 
-      const selectedQuestions = unseen.sort(() => Math.random() - 0.5).slice(0, 15);
+      selectedQuestions = selectedQuestions.sort(() => Math.random() - 0.5);
       
       setQuestions(selectedQuestions);
       setStartTime(Date.now());
@@ -599,7 +616,8 @@ export default function MCQPractice() {
 
   const handleCheck = async () => {
     if (selected !== null) {
-      setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: selected }));
+      const newAnswers = { ...userAnswers, [currentQuestion.id]: selected };
+      setUserAnswers(newAnswers);
       const isCorrect = selected === currentQuestion.correctIndex;
 
       // Save SRS progress in ALL modes
@@ -608,7 +626,7 @@ export default function MCQPractice() {
       }
 
       if (isTestMode) {
-        handleNext();
+        handleNext(newAnswers);
       } else {
         setIsChecked(true);
         
@@ -630,7 +648,7 @@ export default function MCQPractice() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = (finalAnswers?: Record<string, number>) => {
     setSelected(null);
     setIsChecked(false);
     setCurrentHint(null);
@@ -642,7 +660,8 @@ export default function MCQPractice() {
       setIsFinished(true);
       // Save session history
       if (user) {
-        const score = questions.filter(q => userAnswers[q.id] === q.correctIndex).length;
+        const answersToUse = finalAnswers || userAnswers;
+        const score = questions.filter(q => answersToUse[q.id] === q.correctIndex).length;
         const durationSeconds = Math.floor((Date.now() - startTime) / 1000);
         const sessionRef = collection(db, 'users', user.uid, 'sessions');
         addDoc(sessionRef, {
@@ -707,7 +726,7 @@ export default function MCQPractice() {
                 {q.visual && (
                   <div 
                     style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'center', background: 'rgba(255,255,255,0.8)', padding: '1rem', borderRadius: '1rem' }}
-                    dangerouslySetInnerHTML={{ __html: q.visual }} 
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(q.visual) }} 
                   />
                 )}
 
@@ -813,7 +832,7 @@ export default function MCQPractice() {
         {currentQuestion.visual && (
           <div 
             style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'center', background: 'rgba(255,255,255,0.8)', padding: '1rem', borderRadius: '1rem' }}
-            dangerouslySetInnerHTML={{ __html: currentQuestion.visual }} 
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentQuestion.visual) }} 
           />
         )}
 
@@ -918,7 +937,7 @@ export default function MCQPractice() {
               {isTestMode ? 'Next Question' : 'Check Answer'}
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={handleNext}>
+            <button className="btn btn-primary" onClick={() => handleNext()}>
               {currentIndex < questions.length - 1 ? (
                 <>Next Question <ArrowRight size={20} /></>
               ) : (

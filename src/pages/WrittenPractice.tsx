@@ -148,8 +148,8 @@ export default function WrittenPractice() {
         addDoc(sessionRef, {
           subject: activeSubject,
           type: taskType === 'Comprehension' ? 'Structured Questions' : 'Extended Task',
-          score: result.marksAwarded,
-          total: result.maxMarks,
+          score: result.score,
+          total: result.maxScore,
           examHash: examData.hash || null,
           timestamp: Timestamp.now(),
           durationSeconds,

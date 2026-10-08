@@ -2,9 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { gradeSubmission, generateMockExam } from '../lib/gemini';
-
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../lib/firebase';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 export default function ExamSimulator() {
+  const { user } = useAuth();
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
   const activeSubject = subject || 'english';
@@ -60,6 +63,20 @@ export default function ExamSimulator() {
         totalScore: compResult.score + writeResult.score,
         totalMax: compResult.maxScore + writeResult.maxScore
       });
+
+      if (user) {
+        const durationSeconds = 3600 - timeLeft;
+        const sessionRef = collection(db, 'users', user.uid, 'sessions');
+        addDoc(sessionRef, {
+          subject: activeSubject,
+          type: 'Mock Exam',
+          score: compResult.score + writeResult.score,
+          total: compResult.maxScore + writeResult.maxScore,
+          timestamp: Timestamp.now(),
+          durationSeconds,
+          topics: ['Full Paper']
+        }).catch(console.error);
+      }
     } catch (error) {
       console.error(error);
       alert("Failed to grade exam. Please try again.");
