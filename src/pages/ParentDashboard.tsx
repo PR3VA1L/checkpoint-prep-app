@@ -12,6 +12,7 @@ export default function ParentDashboard() {
   const [linkError, setLinkError] = useState('');
 
   const [loading, setLoading] = useState(true);
+  const [students, setStudents] = useState<{uid: string, name: string}[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   
   const [timeframe, setTimeframe] = useState<'today' | 'week'>('today');
@@ -42,6 +43,7 @@ export default function ParentDashboard() {
         studentData.push({ uid, name: 'Student ' + uid.substring(0, 4) }); 
         // Note: For a real app we might store student name in a public profile or subcollection
       }
+      setStudents(studentData);
       if (!selectedStudentId && studentData.length > 0) {
         setSelectedStudentId(studentData[0].uid);
       }
@@ -216,9 +218,22 @@ export default function ParentDashboard() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', paddingBottom: '4rem' }}>
       
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>Parent Dashboard</h1>
+          <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            Parent Dashboard
+            {students.length > 1 && (
+              <select 
+                value={selectedStudentId || ''} 
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+                style={{ fontSize: '1rem', padding: '0.5rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-main)', cursor: 'pointer' }}
+              >
+                {students.map(s => (
+                  <option key={s.uid} value={s.uid}>{s.name}</option>
+                ))}
+              </select>
+            )}
+          </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>Monitoring progress and identifying growth opportunities.</p>
         </div>
         
