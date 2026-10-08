@@ -4,7 +4,8 @@ import { PenTool, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { extractHandwritingOCR, gradeSubmission, generateMockExam } from '../lib/gemini';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, getDocs, query, where } from 'firebase/firestore';
+import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
 
 export default function WrittenPractice() {
@@ -33,7 +34,45 @@ export default function WrittenPractice() {
   const startPractice = async () => {
     setIsGenerating(true);
     try {
-      const data = await generateMockExam(activeSubject);
+      let seenExamHashes = new Set<number>();
+      if (user) {
+        try {
+          const sessionQuery = query(collection(db, 'users', user.uid, 'sessions'), where('subject', '==', activeSubject));
+          const snapshot = await getDocs(sessionQuery);
+          snapshot.forEach(doc => {
+            if (doc.data().examHash) seenExamHashes.add(doc.data().examHash);
+          });
+        } catch (e) {
+          console.error('Failed to get sessions', e);
+        }
+      }
+
+      const bank = MOCK_EXAM_BANK[activeSubject] || [];
+      const unseenExams = bank.filter(exam => {
+        let hash = 0;
+        const text = exam.comprehension?.passage || exam.writing?.instructions || '';
+        for (let i = 0; i < text.length; i++) {
+          hash = (hash << 5) - hash + text.charCodeAt(i);
+          hash &= hash;
+        }
+        return !seenExamHashes.has(hash);
+      });
+
+      let data;
+      if (unseenExams.length > 0) {
+        data = unseenExams[Math.floor(Math.random() * unseenExams.length)];
+      } else {
+        data = await generateMockExam(activeSubject);
+      }
+
+      let hash = 0;
+      const text = data.comprehension?.passage || data.writing?.instructions || '';
+      for (let i = 0; i < text.length; i++) {
+        hash = (hash << 5) - hash + text.charCodeAt(i);
+        hash &= hash;
+      }
+      data.hash = hash;
+
       setExamData(data);
       setStartTime(Date.now());
       setIsSetupComplete(true);
@@ -111,6 +150,7 @@ export default function WrittenPractice() {
           type: taskType === 'Comprehension' ? 'Structured Questions' : 'Extended Task',
           score: result.marksAwarded,
           total: result.maxMarks,
+          examHash: examData.hash || null,
           timestamp: Timestamp.now(),
           durationSeconds,
           topics: ['Written Practice']

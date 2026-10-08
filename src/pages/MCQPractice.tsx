@@ -66,6 +66,8 @@ export default function MCQPractice() {
   const [numQuestions, setNumQuestions] = useState<number | string>(10);
   const [isTestMode, setIsTestMode] = useState(false);
   const [allowHints, setAllowHints] = useState(true);
+  const [isTimed, setIsTimed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   // FIX: Reset selected topics when subject changes via URL
   useEffect(() => {
@@ -163,12 +165,23 @@ export default function MCQPractice() {
       setSelected(null);
       setIsChecked(false);
       setCurrentHint(null);
+      if (isTimed) setTimeLeft(selectedQuestions.length * 60); // 1 minute per question
     } catch (err) {
       setErrorMsg('Failed to start daily plan.');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let timer: any;
+    if (isTimed && !isFinished && timeLeft !== null && timeLeft > 0) {
+      timer = setInterval(() => setTimeLeft(prev => prev! - 1), 1000);
+    } else if (isTimed && timeLeft === 0 && !isFinished) {
+      setIsFinished(true); // Auto-finish when time is up
+    }
+    return () => clearInterval(timer);
+  }, [isTimed, isFinished, timeLeft]);
 
   useEffect(() => {
     if (location.search.includes('plan=daily')) {
@@ -260,9 +273,15 @@ export default function MCQPractice() {
         
         // If we don't have enough unseen, fall back to reusing seen ones
         if (unseenBank.length < (questionCount - qList.length)) {
-           // We prioritize unseen, but add seen ones to fill the gap
            const seenBank = formattedBank.filter(q => progressIds.has(q.id));
            unseenBank = [...unseenBank, ...seenBank];
+        }
+
+        // --- SECOND FALLBACK: Drop Topic Filter if STILL not enough ---
+        if (unseenBank.length < (questionCount - qList.length) && selectedTopics.length > 0) {
+           const broaderBank = QUESTION_BANK.filter(q => q.subject === activeSubject && q.difficulty === selectedDifficulty);
+           const formattedBroader = broaderBank.map((q, idx) => ({ ...q, id: 'broader-' + idx }));
+           unseenBank = [...unseenBank, ...formattedBroader];
         }
 
         const needed = questionCount - qList.length;
@@ -506,6 +525,17 @@ export default function MCQPractice() {
               <span style={{ fontWeight: 'bold' }}>Enable AI Tutor Hints</span>
               <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>(Penalizes score if used)</span>
             </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
+              <input 
+                type="checkbox" 
+                checked={isTimed} 
+                onChange={(e) => setIsTimed(e.target.checked)}
+                style={{ width: '1.25rem', height: '1.25rem' }} 
+              />
+              <span style={{ fontWeight: 'bold' }}>Timed Practice</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>(1 min per question)</span>
+            </label>
           </div>
 
           {errorMsg && (
@@ -548,38 +578,22 @@ export default function MCQPractice() {
 
   const triggerWrestlemaniaVoice = (streakCount: number) => {
     let word = '';
-    if (streakCount === 3) word = 'SENSATIONAL!';
-    else if (streakCount === 5) word = 'UNSTOPPABLE!';
-    else if (streakCount >= 7) word = 'GOD LIKE!';
+    let audioFile = '';
+    if (streakCount === 3) { word = 'SENSATIONAL!'; audioFile = '/sounds/sensational.mp3'; }
+    else if (streakCount === 5) { word = 'UNSTOPPABLE!'; audioFile = '/sounds/unstoppable.mp3'; }
+    else if (streakCount >= 7) { word = 'GOD LIKE!'; audioFile = '/sounds/godlike.mp3'; }
     else return;
 
     setShowAnnouncer(word);
     setTimeout(() => setShowAnnouncer(''), 2000);
 
     try {
-      // Sports commentator voice!
-      const utterance = new SpeechSynthesisUtterance(word);
-      const voices = window.speechSynthesis.getVoices();
-      
-      // Look for a deep/announcer-like voice (UK Male or Google UK English Male usually sounds best)
-      const announcerVoice = voices.find(v => 
-        v.name.includes('Google UK English Male') || 
-        v.name.includes('Daniel') || 
-        (v.lang.includes('en-GB') && v.name.includes('Male'))
-      ) || voices.find(v => v.lang.startsWith('en'));
-
-      if (announcerVoice) utterance.voice = announcerVoice;
-      
-      // Make it sound hyped like a sports commentator
-      utterance.pitch = 0.8; // Deeper
-      utterance.rate = 1.3;  // Faster and more energetic
-      utterance.volume = 1;
-
-      // Cancel any ongoing speech so it doesn't queue up
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      // Use real MP3 sound effects from the public folder instead of robotic TTS
+      const audio = new Audio(audioFile);
+      audio.volume = 1.0;
+      audio.play().catch(e => console.warn('Could not play announcer voice. Please ensure you have added the MP3 files to public/sounds/', e));
     } catch (e) {
-      console.error('Speech synthesis failed', e);
+      console.error('Audio playback failed', e);
     }
   };
 
@@ -772,10 +786,17 @@ export default function MCQPractice() {
           </span>
           <h1 style={{ marginTop: '0.5rem', fontSize: '1.75rem' }}>Question {currentIndex + 1} of {questions.length}</h1>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {questions.map((_, i) => (
-            <div key={i} style={{ width: '2rem', height: '0.5rem', background: i <= currentIndex ? 'var(--primary)' : 'rgba(0,0,0,0.1)', borderRadius: '1rem' }} />
-          ))}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+          {isTimed && timeLeft !== null && (
+            <div style={{ padding: '0.5rem 1rem', background: timeLeft < 30 ? 'rgba(239, 68, 68, 0.1)' : 'var(--surface)', color: timeLeft < 30 ? 'var(--danger)' : 'var(--text-main)', borderRadius: '0.5rem', fontWeight: 'bold', fontSize: '1.25rem' }}>
+              ⏱️ {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {questions.map((_, i) => (
+              <div key={i} style={{ width: '2rem', height: '0.5rem', background: i <= currentIndex ? 'var(--primary)' : 'rgba(0,0,0,0.1)', borderRadius: '1rem' }} />
+            ))}
+          </div>
         </div>
       </div>
 

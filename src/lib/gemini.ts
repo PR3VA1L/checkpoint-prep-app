@@ -199,23 +199,29 @@ Generate a full mock exam tailored to Year 6 (11-year-olds) for this subject.
 
 If subject is ENGLISH:
 Provide a reading comprehension passage (approx 200 words) and 5-7 questions worth 1-2 marks each.
-Provide a writing prompt for a short story or report (150-200 words).
+Provide a writing prompt for a short story or report (150-200 words) worth 15 marks.
 
-If subject is MATH or SCIENCE:
-Provide a "structured scenario" (like an experiment context or data set) instead of a story passage, followed by 5-7 short-answer questions. DO NOT use the topic "Waves" (it is not Year 6).
-Provide a longer "Extended Problem Solving / Investigation" prompt for the writing section.
+If subject is MATH:
+Generate 15-20 short-answer questions structured EXACTLY like a Cambridge Primary Checkpoint Mathematics Paper 1. 
+Questions should be varied (e.g. calculation, ordering fractions, completing sequences, basic geometry, mental math).
+Each question should be worth 1 or 2 marks. Provide them as an array of questions.
+
+If subject is SCIENCE:
+Generate 6-8 structured questions EXACTLY like a Cambridge Primary Checkpoint Science Paper.
+Each question MUST have multiple parts (e.g. 1a, 1b, 1c) revolving around a single structured scenario, experiment, or diagram description. 
+DO NOT use the topic "Waves" (it is not Year 6).
 
 OUTPUT STRICTLY IN JSON FORMAT matching this exact interface:
 {
   "comprehension": {
-    "title": "string",
-    "passage": "string (the story or the scientific/math scenario)",
+    "title": "string (or 'Math Paper' / 'Science Paper')",
+    "passage": "string (the story, or the general instructions/scenario for the math/science paper)",
     "questions": [
-      { "id": number, "text": "string", "marks": number }
+      { "id": number, "text": "string (For Science, include the full multi-part question text like '1(a) ... 1(b) ...')", "marks": number }
     ]
   },
   "writing": {
-    "instructions": "string (the prompt for the long form answer)"
+    "instructions": "string (the prompt for the long form answer, or null if it's a Math/Science exam that only has short answers)"
   }
 }
 
