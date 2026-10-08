@@ -1,9 +1,29 @@
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { getAuth } from 'firebase/auth';
 import { app } from './firebase';
 import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
-const functions = getFunctions(app);
-const geminiProxy = httpsCallable(functions, 'geminiProxy');
+async function geminiProxy(body: any) {
+  const auth = getAuth(app);
+  let token = '';
+  if (auth.currentUser) {
+    token = await auth.currentUser.getIdToken();
+  }
+  
+  const response = await fetch('/api/gemini', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    },
+    body: JSON.stringify(body)
+  });
+  
+  if (!response.ok) {
+    throw new Error('API request failed');
+  }
+  
+  return response.json();
+}
 
 const WRITING_SYSTEM_PROMPT = `
 You are a highly pedantic, rigorous Cambridge Primary Checkpoint Examiner (0058/0844/0096/0097). 
