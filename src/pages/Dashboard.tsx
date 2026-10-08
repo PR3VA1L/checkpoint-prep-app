@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
+import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles, RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { collection, query, where, getDocs, Timestamp, doc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -204,8 +204,11 @@ export default function Dashboard() {
           Allow your parents to track your progress by giving them this code.
         </p>
         {profile?.linkingCode ? (
-          <div style={{ padding: '1rem', background: 'var(--surface)', borderRadius: '0.75rem', border: '1px dashed var(--border)', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', letterSpacing: '2px' }}>
-            {profile.linkingCode}
+          <div style={{ padding: '1rem', background: 'var(--surface)', borderRadius: '0.75rem', border: '1px dashed var(--border)', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', letterSpacing: '2px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
+            <span>{profile.linkingCode}</span>
+            <button onClick={generateLinkCode} disabled={generatingCode} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }} title="Generate new code">
+              <RefreshCw size={18} className={generatingCode ? 'animate-spin' : ''} />
+            </button>
           </div>
         ) : (
           <button 
