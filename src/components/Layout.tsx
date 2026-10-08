@@ -26,6 +26,7 @@ export default function Layout() {
     { path: `/practice/mcq/${currentSubject}`, match: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
     { path: `/practice/written/${currentSubject}`, match: '/practice/written', label: 'Written Tasks', icon: PenTool },
     { path: '/history', label: 'History', icon: History },
+    { path: '/contact', label: 'Contact Us', icon: PenTool },
   ];
 
   return (

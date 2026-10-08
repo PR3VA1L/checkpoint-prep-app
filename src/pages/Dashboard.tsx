@@ -118,9 +118,40 @@ export default function Dashboard() {
           <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', padding: '1rem', borderRadius: '1rem' }}>
             {loading ? <Loader2 className="animate-spin" /> : <Trophy size={32} />}
           </div>
-          <div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{loading ? '-' : stats.mastered}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Concepts Mastered</p>
+          <div style={{ flex: 1 }}>
+            {(() => {
+              const m = stats.mastered;
+              let level = 1;
+              let title = "Beginner";
+              let max = 5;
+              if (m >= 100) { level = 5; title = "Master"; max = m; }
+              else if (m >= 50) { level = 4; title = "Expert"; max = 100; }
+              else if (m >= 20) { level = 3; title = "Proficient"; max = 50; }
+              else if (m >= 5) { level = 2; title = "Learner"; max = 20; }
+
+              const progress = level === 5 ? 100 : (m / max) * 100;
+              
+              return (
+                <div style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.25rem' }}>
+                    <p style={{ fontSize: '1.25rem', fontWeight: 'bold', lineHeight: 1 }}>
+                      Level {level}: <span style={{ color: 'var(--success)' }}>{title}</span>
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <span key={star} style={{ color: star <= level ? '#eab308' : 'rgba(0,0,0,0.1)', fontSize: '1.1rem' }}>★</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ width: '100%', height: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '1rem', overflow: 'hidden' }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--success)', borderRadius: '1rem', transition: 'width 0.5s' }} />
+                  </div>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
+                    {m} / {level === 5 ? '∞' : max} concepts mastered
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </div>
 

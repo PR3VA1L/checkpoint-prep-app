@@ -8,6 +8,7 @@ import WrittenPractice from './pages/WrittenPractice';
 import ExamSimulator from './pages/ExamSimulator';
 import Auth from './pages/Auth';
 import History from './pages/History';
+import ContactUs from './pages/ContactUs';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode, allowedRole?: 'student' | 'parent' }) => {
@@ -62,6 +63,11 @@ function App() {
             <Route path="practice/mcq" element={<Navigate to="english" replace />} />
             <Route path="practice/written" element={<Navigate to="english" replace />} />
             <Route path="practice/exam" element={<Navigate to="english" replace />} />
+            <Route path="contact" element={
+              <ProtectedRoute allowedRole="student">
+                <ContactUs />
+              </ProtectedRoute>
+            } />
           </Route>
 
           <Route path="/parent" element={<ParentLayout />}>
