@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, Timestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { UserProgress } from '../lib/srs';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -76,13 +76,13 @@ export default function Dashboard() {
     setGeneratingCode(true);
     try {
       const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         linkingCode: newCode
-      });
+      }, { merge: true });
       await refreshProfile();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Failed to generate code.");
+      alert("Failed to generate code. Error: " + e.message);
     } finally {
       setGeneratingCode(false);
     }
