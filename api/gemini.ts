@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let resultText = '';
 
     if (imageBase64) {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemPrompt });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash', systemInstruction: systemPrompt });
       const result = await model.generateContent([
         prompt,
         {
@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ]);
       resultText = result.response.text();
     } else {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', systemInstruction: systemPrompt });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash', systemInstruction: systemPrompt });
       const result = await model.generateContent(prompt);
       resultText = result.response.text();
     }

@@ -1,80 +1,123 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { Clock, Loader2, Settings } from 'lucide-react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { gradeSubmission, generateMockExam } from '../lib/gemini';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { MOCK_EXAM_BANK } from '../data/mockExamBank';
+import { gradeSubmission } from '../lib/gemini';
 
 export default function ExamSimulator() {
   const { user } = useAuth();
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
-  const activeSubject = subject || 'english';
+  const activeSubject = (subject || 'english').toLowerCase();
+  
+  const [selectedPaper, setSelectedPaper] = useState<'Paper 1' | 'Paper 2'>('Paper 1');
+  const [selectedSection, setSelectedSection] = useState<'Comprehension' | 'Writing' | 'Both'>('Both'); 
+  
   const [examData, setExamData] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(3600); // 1 hour in seconds
+  const [timeLeft, setTimeLeft] = useState(3600); 
   
-  const [compAnswers, setCompAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [essayText, setEssayText] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
 
+  useEffect(() => {
+    // Reset selections on subject change
+    setSelectedPaper('Paper 1');
+    setSelectedSection('Both');
+  }, [activeSubject]);
+
   const startExam = async () => {
     setIsGenerating(true);
     try {
-      const data = await generateMockExam(activeSubject);
-      setExamData(data);
+      const exams = MOCK_EXAM_BANK[activeSubject] || [];
+      const paperExams = exams.filter(e => e.paper === selectedPaper);
+      
+      if (paperExams.length === 0) {
+        alert(`Sorry, we don't have enough ${selectedPaper} exams generated for ${activeSubject} right now. Try checking the generation script.`);
+        setIsGenerating(false);
+        return;
+      }
+      
+      const randomExam = paperExams[Math.floor(Math.random() * paperExams.length)];
+      setExamData(randomExam);
       setHasStarted(true);
-      setTimeLeft(3600);
-      setCompAnswers({});
+      
+      // Determine time
+      if (activeSubject === 'english' && selectedSection !== 'Both') {
+          setTimeLeft(1800); // 30 mins for half
+      } else {
+          setTimeLeft(3600); // 60 mins for full
+      }
+      
+      setAnswers({});
       setEssayText('');
     } catch (err) {
-      alert("Failed to generate exam. Please check your API key and connection.");
+      alert("Failed to load exam.");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Refs to avoid stale closures in the timer auto-submit
-  const compAnswersRef = useRef(compAnswers);
+  const answersRef = useRef(answers);
   const essayTextRef = useRef(essayText);
   useEffect(() => {
-    compAnswersRef.current = compAnswers;
+    answersRef.current = answers;
     essayTextRef.current = essayText;
-  }, [compAnswers, essayText]);
+  }, [answers, essayText]);
 
   const handleSubmit = useCallback(async () => {
     if (!examData) return;
     setIsSubmitting(true);
     try {
-      // Grade Comprehension
-      const compPrompt = `Passage: ${examData.comprehension.passage}\nQuestions: ${JSON.stringify(examData.comprehension.questions)}`;
-      const compResult = await gradeSubmission(compPrompt, JSON.stringify(compAnswersRef.current), 'Comprehension');
+      let totalScore = 0;
+      let totalMax = 0;
+      let finalFeedback: any = { sections: [] };
 
-      // Grade Writing
-      const writeResult = await gradeSubmission(examData.writing.instructions, essayTextRef.current, 'Writing');
+      if (activeSubject === 'english') {
+          if (selectedSection === 'Both' || selectedSection === 'Comprehension') {
+              const compPrompt = `Passage: ${examData.comprehension.passage}\\nQuestions: ${JSON.stringify(examData.comprehension.questions)}`;
+              const compResult = await gradeSubmission(compPrompt, JSON.stringify(answersRef.current), 'Comprehension');
+              finalFeedback.sections.push({ name: 'Comprehension', result: compResult });
+              totalScore += compResult.score;
+              totalMax += compResult.maxScore;
+          }
+          if (selectedSection === 'Both' || selectedSection === 'Writing') {
+              const writeResult = await gradeSubmission(examData.writing.instructions, essayTextRef.current, 'Writing');
+              finalFeedback.sections.push({ name: 'Writing', result: writeResult });
+              totalScore += writeResult.score;
+              totalMax += writeResult.maxScore;
+          }
+      } else {
+          const structuredPrompt = `Questions: ${JSON.stringify(examData.questions)}`;
+          const res = await gradeSubmission(structuredPrompt, JSON.stringify(answersRef.current), 'Structured Paper');
+          finalFeedback.sections.push({ name: 'Structured Questions', result: res });
+          totalScore += res.score;
+          totalMax += res.maxScore;
+      }
 
-      setFeedback({
-        comprehension: compResult,
-        writing: writeResult,
-        totalScore: compResult.score + writeResult.score,
-        totalMax: compResult.maxScore + writeResult.maxScore
-      });
+      finalFeedback.totalScore = totalScore;
+      finalFeedback.totalMax = totalMax;
+      setFeedback(finalFeedback);
 
       if (user) {
         const durationSeconds = 3600 - timeLeft;
         const sessionRef = collection(db, 'users', user.uid, 'sessions');
         addDoc(sessionRef, {
           subject: activeSubject,
-          type: 'Mock Exam',
-          score: compResult.score + writeResult.score,
-          total: compResult.maxScore + writeResult.maxScore,
+          type: 'Structured Exam',
+          paper: selectedPaper,
+          score: totalScore,
+          total: totalMax,
           timestamp: Timestamp.now(),
           durationSeconds,
-          topics: ['Full Paper']
+          topics: [selectedPaper]
         }).catch(console.error);
       }
     } catch (error) {
@@ -83,7 +126,7 @@ export default function ExamSimulator() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [examData]);
+  }, [examData, activeSubject, selectedPaper, selectedSection, user, timeLeft]);
 
   useEffect(() => {
     let timer: any;
@@ -113,7 +156,7 @@ export default function ExamSimulator() {
   if (!hasStarted) {
     return (
       <div style={{ maxWidth: '600px', margin: '4rem auto', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', textTransform: 'capitalize' }}>Full {activeSubject} Exam Simulator</h1>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem', textTransform: 'capitalize' }}>Structured Exam Simulator</h1>
         
         {/* Subject Selector */}
         <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', marginBottom: '2rem', justifyContent: 'center' }}>
@@ -141,22 +184,47 @@ export default function ExamSimulator() {
 
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'left' }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.5rem', color: 'var(--accent)' }}>
-            <AlertTriangle size={32} />
-            <h2 style={{ margin: 0 }}>Strict Exam Conditions</h2>
+            <Settings size={32} />
+            <h2 style={{ margin: 0 }}>Configure Paper</h2>
           </div>
-          <ul style={{ fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '2rem', color: 'var(--text-main)' }}>
-            <li>You will have exactly <strong>1 Hour (60 minutes)</strong> to complete the paper.</li>
-            <li>The paper consists of a <strong>Reading Comprehension</strong> section and a <strong>Writing Task</strong>.</li>
-            <li>When the timer reaches zero, your paper will be automatically submitted and marked by the AI Examiner.</li>
+          
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Select Paper Variant</label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+                <button onClick={() => setSelectedPaper('Paper 1')} className={`btn ${selectedPaper === 'Paper 1' ? 'btn-primary' : ''}`} style={{ flex: 1 }}>Paper 1</button>
+                <button onClick={() => setSelectedPaper('Paper 2')} className={`btn ${selectedPaper === 'Paper 2' ? 'btn-primary' : ''}`} style={{ flex: 1 }}>Paper 2</button>
+            </div>
+            {activeSubject === 'math' && (
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
+                  {selectedPaper === 'Paper 1' ? 'Calculators are NOT allowed.' : 'Calculators ARE allowed.'}
+                </p>
+            )}
+          </div>
+
+          {activeSubject === 'english' && (
+            <div style={{ marginBottom: '2.5rem' }}>
+                <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.5rem' }}>Select Section</label>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button onClick={() => setSelectedSection('Comprehension')} className={`btn ${selectedSection === 'Comprehension' ? 'btn-primary' : ''}`} style={{ flex: 1 }}>Comprehension Only</button>
+                    <button onClick={() => setSelectedSection('Writing')} className={`btn ${selectedSection === 'Writing' ? 'btn-primary' : ''}`} style={{ flex: 1 }}>Writing Only</button>
+                    <button onClick={() => setSelectedSection('Both')} className={`btn ${selectedSection === 'Both' ? 'btn-primary' : ''}`} style={{ flex: 1 }}>Full Paper</button>
+                </div>
+            </div>
+          )}
+
+          <ul style={{ fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '2rem', color: 'var(--text-main)', background: 'rgba(255,255,255,0.5)', padding: '1rem 2rem', borderRadius: '1rem' }}>
+            <li>You will have <strong>{activeSubject === 'english' && selectedSection !== 'Both' ? '30 Minutes' : '60 Minutes'}</strong> to complete this paper.</li>
+            <li>Questions are designed to strictly mimic Cambridge Primary Checkpoint Year 6.</li>
             <li>Do not close or refresh this page during the exam.</li>
           </ul>
+          
           <button 
             className="btn" 
             style={{ background: 'var(--accent)', color: 'white', width: '100%', fontSize: '1.25rem' }} 
             onClick={startExam}
             disabled={isGenerating}
           >
-            {isGenerating ? <><Loader2 className="animate-spin" style={{ display: 'inline', marginRight: '0.5rem' }} /> Generating Exam...</> : 'Start the Timer & Begin'}
+            {isGenerating ? <><Loader2 className="animate-spin" style={{ display: 'inline', marginRight: '0.5rem' }} /> Loading Exam...</> : 'Start the Timer & Begin'}
           </button>
         </div>
       </div>
@@ -164,7 +232,7 @@ export default function ExamSimulator() {
   }
 
   if (feedback) {
-    const percentage = Math.round((feedback.totalScore / feedback.totalMax) * 100);
+    const percentage = Math.round((feedback.totalScore / feedback.totalMax) * 100) || 0;
     return (
       <div style={{ maxWidth: '800px', margin: '2rem auto', paddingBottom: '4rem' }}>
         <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', marginBottom: '2rem' }}>
@@ -187,39 +255,26 @@ export default function ExamSimulator() {
           </Link>
         </div>
 
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Section 1: Reading Comprehension</h2>
-        <div className="glass-card" style={{ padding: '2rem', marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-            <span style={{ fontWeight: 'bold' }}>Score: {feedback.comprehension.score}/{feedback.comprehension.maxScore}</span>
-          </div>
-          <p style={{ marginBottom: '2rem', fontSize: '1.1rem' }}>{feedback.comprehension.summary}</p>
-          {feedback.comprehension.breakdown.map((b: any, i: number) => (
-            <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.5)', borderRadius: '0.75rem', marginBottom: '1rem', borderLeft: '4px solid var(--secondary)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <h4 style={{ margin: 0 }}>{b.criteria}</h4>
-                <span style={{ fontWeight: 'bold' }}>{b.score}/{b.max}</span>
-              </div>
-              <p style={{ margin: 0, color: 'var(--text-muted)' }}>{b.note}</p>
+        {feedback.sections.map((section: any, idx: number) => (
+            <div key={idx}>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', marginTop: '2rem' }}>{section.name}</h2>
+                <div className="glass-card" style={{ padding: '2rem', marginBottom: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
+                    <span style={{ fontWeight: 'bold' }}>Score: {section.result.score}/{section.result.maxScore}</span>
+                  </div>
+                  <p style={{ marginBottom: '2rem', fontSize: '1.1rem' }}>{section.result.summary}</p>
+                  {section.result.breakdown.map((b: any, i: number) => (
+                    <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.5)', borderRadius: '0.75rem', marginBottom: '1rem', borderLeft: `4px solid var(--${i % 2 === 0 ? 'primary' : 'secondary'})` }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <h4 style={{ margin: 0 }}>{b.criteria}</h4>
+                        <span style={{ fontWeight: 'bold' }}>{b.score}/{b.max}</span>
+                      </div>
+                      <p style={{ margin: 0, color: 'var(--text-muted)' }}>{b.note}</p>
+                    </div>
+                  ))}
+                </div>
             </div>
-          ))}
-        </div>
-
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Section 2: Writing Task</h2>
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-            <span style={{ fontWeight: 'bold' }}>Score: {feedback.writing.score}/{feedback.writing.maxScore}</span>
-          </div>
-          <p style={{ marginBottom: '2rem', fontSize: '1.1rem' }}>{feedback.writing.summary}</p>
-          {feedback.writing.breakdown.map((b: any, i: number) => (
-            <div key={i} style={{ padding: '1rem', background: 'rgba(255,255,255,0.5)', borderRadius: '0.75rem', marginBottom: '1rem', borderLeft: '4px solid var(--primary)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <h4 style={{ margin: 0 }}>{b.criteria}</h4>
-                <span style={{ fontWeight: 'bold' }}>{b.score}/{b.max}</span>
-              </div>
-              <p style={{ margin: 0, color: 'var(--text-muted)' }}>{b.note}</p>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     );
   }
@@ -227,7 +282,6 @@ export default function ExamSimulator() {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '6rem' }}>
       
-      {/* Sticky Header with Timer */}
       <div style={{ 
         position: 'sticky', top: '1rem', zIndex: 100, 
         background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)',
@@ -235,7 +289,7 @@ export default function ExamSimulator() {
         boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         marginBottom: '2rem'
       }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', textTransform: 'capitalize' }}>Cambridge Primary {activeSubject} Checkpoint</h2>
+        <h2 style={{ margin: 0, fontSize: '1.25rem', textTransform: 'capitalize' }}>Cambridge {activeSubject} - {selectedPaper}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: timeLeft < 300 ? 'var(--danger)' : 'var(--text-main)', fontWeight: 'bold', fontSize: '1.25rem' }}>
             <Clock /> {formatTime(timeLeft)}
@@ -248,62 +302,86 @@ export default function ExamSimulator() {
 
       <div className="responsive-flex">
         
-        {/* Left Side: Reading Material */}
+        {/* Left Side: Material */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--secondary)', marginBottom: '1rem' }}>Section 1: {activeSubject === 'english' ? 'Reading' : 'Context'}</h3>
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData.comprehension.title}</h2>
-            <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
-              {examData.comprehension.passage}
-            </div>
-          </div>
+          {activeSubject === 'english' && (selectedSection === 'Both' || selectedSection === 'Comprehension') && (
+              <div className="glass-card" style={{ padding: '2rem' }}>
+                <h3 style={{ fontSize: '1.25rem', color: 'var(--secondary)', marginBottom: '1rem' }}>Reading Comprehension</h3>
+                <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>{examData?.comprehension?.title}</h2>
+                <div style={{ lineHeight: '1.8', fontSize: '1.1rem', color: 'var(--text-main)', whiteSpace: 'pre-wrap' }}>
+                  {examData?.comprehension?.passage}
+                </div>
+              </div>
+          )}
 
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '1rem' }}>Section 2: {activeSubject === 'english' ? 'Writing Prompt' : 'Investigation'}</h3>
-            <p style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{examData.writing.instructions}</p>
-          </div>
+          {activeSubject === 'english' && (selectedSection === 'Both' || selectedSection === 'Writing') && (
+              <div className="glass-card" style={{ padding: '2rem' }}>
+                <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '1rem' }}>Writing Task</h3>
+                <p style={{ fontSize: '1.1rem', fontWeight: 'bold' }}>{examData?.writing?.instructions}</p>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>[Total marks: {examData?.writing?.totalMarks}]</p>
+              </div>
+          )}
+
+          {activeSubject !== 'english' && (
+              <div className="glass-card" style={{ padding: '2rem' }}>
+                 <h3 style={{ fontSize: '1.25rem', color: 'var(--primary)', marginBottom: '1rem' }}>Structured Questions</h3>
+                 <p style={{ fontSize: '1.1rem' }}>Read each question carefully and type your structured answer in the provided boxes on the right.</p>
+                 {activeSubject === 'math' && selectedPaper === 'Paper 1' && (
+                     <p style={{ color: 'var(--danger)', fontWeight: 'bold' }}>Calculators are NOT allowed.</p>
+                 )}
+                 {activeSubject === 'math' && selectedPaper === 'Paper 2' && (
+                     <p style={{ color: 'var(--secondary)', fontWeight: 'bold' }}>Calculators are allowed.</p>
+                 )}
+              </div>
+          )}
         </div>
 
         {/* Right Side: Answer Sheet */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
           
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Part 1 Answers</h3>
-            {examData.comprehension.questions.map((q: any) => (
-              <div key={q.id} style={{ marginBottom: '2rem' }}>
-                <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
-                  {q.id}. {q.text} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 'normal' }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span>
-                </p>
+          {((activeSubject === 'english' && (selectedSection === 'Both' || selectedSection === 'Comprehension')) || activeSubject !== 'english') && (
+              <div className="glass-card" style={{ padding: '2rem' }}>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Structured Answers</h3>
+                {(activeSubject === 'english' ? examData?.comprehension?.questions : examData?.questions)?.map((q: any) => (
+                  <div key={q.id} style={{ marginBottom: '2rem' }}>
+                    <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
+                      {q.id}. {q.text} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 'normal' }}>[{q.marks} mark{q.marks > 1 ? 's' : ''}]</span>
+                    </p>
+                    <textarea
+                      value={answers[q.id] || ''}
+                      onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                      placeholder="Type your answer here..."
+                      style={{
+                        width: '100%', minHeight: '80px', padding: '1rem',
+                        borderRadius: '0.5rem', border: '1px solid var(--border)',
+                        background: 'rgba(255,255,255,0.7)', outline: 'none', resize: 'vertical',
+                        fontSize: '1rem'
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+          )}
+
+          {activeSubject === 'english' && (selectedSection === 'Both' || selectedSection === 'Writing') && (
+              <div className="glass-card" style={{ padding: '2rem' }}>
+                <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Writing Submission</h3>
                 <textarea
-                  value={compAnswers[q.id] || ''}
-                  onChange={(e) => setCompAnswers({ ...compAnswers, [q.id]: e.target.value })}
+                  value={essayText}
+                  onChange={(e) => setEssayText(e.target.value)}
+                  placeholder="Begin your writing here..."
                   style={{
-                    width: '100%', minHeight: '60px', padding: '1rem',
+                    width: '100%', minHeight: '400px', padding: '1rem',
                     borderRadius: '0.5rem', border: '1px solid var(--border)',
-                    background: 'rgba(255,255,255,0.7)', outline: 'none', resize: 'vertical'
+                    background: 'rgba(255,255,255,0.7)', outline: 'none', resize: 'vertical',
+                    lineHeight: '1.6', fontSize: '1.1rem'
                   }}
                 />
+                <div style={{ textAlign: 'right', marginTop: '1rem', color: 'var(--text-muted)' }}>
+                  {essayText.split(/\\s+/).filter(w => w.length > 0).length} words
+                </div>
               </div>
-            ))}
-          </div>
-
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Part 2 Answer (Essay)</h3>
-            <textarea
-              value={essayText}
-              onChange={(e) => setEssayText(e.target.value)}
-              placeholder="Begin your writing here..."
-              style={{
-                width: '100%', minHeight: '400px', padding: '1rem',
-                borderRadius: '0.5rem', border: '1px solid var(--border)',
-                background: 'rgba(255,255,255,0.7)', outline: 'none', resize: 'vertical',
-                lineHeight: '1.6', fontSize: '1.1rem'
-              }}
-            />
-            <div style={{ textAlign: 'right', marginTop: '1rem', color: 'var(--text-muted)' }}>
-              {essayText.split(/\s+/).filter(w => w.length > 0).length} words
-            </div>
-          </div>
+          )}
 
         </div>
       </div>

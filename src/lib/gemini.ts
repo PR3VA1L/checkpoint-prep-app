@@ -72,7 +72,7 @@ Your response MUST be in raw JSON format matching this exact structure:
 }
 `;
 
-export async function gradeSubmission(promptText: string, studentSubmission: string, taskType: 'Writing' | 'Comprehension' = 'Writing') {
+export async function gradeSubmission(promptText: string, studentSubmission: string, taskType: 'Writing' | 'Comprehension' | 'Structured Paper' = 'Writing') {
   try {
     const systemPrompt = taskType === 'Writing' ? WRITING_SYSTEM_PROMPT : COMPREHENSION_SYSTEM_PROMPT;
     const msg = `TASK/PROMPT:\n${promptText}\n\nSTUDENT SUBMISSION:\n${studentSubmission}`;
