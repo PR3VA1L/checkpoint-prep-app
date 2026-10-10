@@ -308,9 +308,9 @@ export default function Dashboard() {
             <div className="animate-float" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--secondary)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1rem', animationDelay: '1s' }}>
               <Star size={48} />
             </div>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{selectedSubject === 'english' ? 'Written Tasks & OCR' : 'Structured Questions & OCR'}</h3>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Structured Practice & OCR</h3>
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              {selectedSubject === 'english' ? 'Write or upload handwritten tasks, graded instantly by AI.' : 'Solve problems or upload working, graded instantly by AI.'}
+              Solve problems or upload working, graded instantly by AI.
             </p>
             <Link to={`/practice/structured/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
               {selectedSubject === 'english' ? 'Start Writing' : 'Start Paper'}

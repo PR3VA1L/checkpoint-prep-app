@@ -128,7 +128,7 @@ export default function ParentDashboard() {
   // Compute Metrics
   let totalSeconds = 0;
   let mcqCount = 0;
-  let writtenCount = 0;
+  let structuredCount = 0;
   let weakTopics: Record<string, { attempts: number, correct: number }> = {};
 
   sessions.forEach(s => {
@@ -137,7 +137,7 @@ export default function ParentDashboard() {
     if (s.type === 'Practice') {
       mcqCount += (s.total || 0);
     } else {
-      writtenCount += (s.total || 0); // treating each sub-question/mark as a count, or just 1 task
+      structuredCount += (s.total || 0); // treating each sub-question/mark as a count, or just 1 task
     }
 
     // Naive topic tracking for weekly report
@@ -172,8 +172,8 @@ export default function ParentDashboard() {
 
     if (weakestTopic && lowestScore < 0.6) {
       actionableAdvice = `We noticed some struggles with "${weakestTopic}" (scoring around ${Math.round(lowestScore * 100)}%). Suggest that they select this specific topic for their next Multiple Choice practice session to build confidence.`;
-    } else if (mcqCount > 0 && writtenCount === 0) {
-      actionableAdvice = "Great job on the multiple choice questions! To prepare fully for the exam, encourage them to try a 'Written Task' or 'Structured Paper' this week.";
+    } else if (mcqCount > 0 && structuredCount === 0) {
+      actionableAdvice = "Great job on the multiple choice questions! To prepare fully for the exam, encourage them to try a 'Structured Practice' this week.";
     }
   }
 
@@ -286,8 +286,8 @@ export default function ParentDashboard() {
             <PenTool size={36} />
           </div>
           <div>
-            <p style={{ fontSize: '2.25rem', fontWeight: 'bold', lineHeight: 1 }}>{writtenCount}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Written Tasks</p>
+            <p style={{ fontSize: '2.25rem', fontWeight: 'bold', lineHeight: 1 }}>{structuredCount}</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Structured Practice</p>
           </div>
         </div>
       </div>

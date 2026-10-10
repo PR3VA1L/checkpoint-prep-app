@@ -24,7 +24,7 @@ export default function Layout() {
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Home },
     { path: `/practice/mcq/${currentSubject}`, match: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
-    { path: `/practice/structured/${currentSubject}`, match: '/practice/structured', label: 'Written Tasks', icon: PenTool },
+    { path: `/practice/structured/${currentSubject}`, match: '/practice/structured', label: 'Structured Practice', icon: PenTool },
     { path: '/history', label: 'History', icon: History },
     { path: '/contact', label: 'Contact Us', icon: PenTool },
   ];
