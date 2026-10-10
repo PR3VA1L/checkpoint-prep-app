@@ -262,7 +262,31 @@ export default function MCQPractice() {
       // Filter out seen questions
       qList = qList.filter(q => !progressIds.has(q.id));
 
-      // --- NEW FALLBACK: Check local question bank first to save API tokens ---
+      // --- NEW PRIMARY: Dynamic Generation (Gemini) ---
+      // Always try to generate fresh questions first to ensure variety
+      if (qList.length < questionCount) {
+        try {
+          const numToGenerate = questionCount - qList.length;
+          const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
+          
+          if (generatedQuestions.length > 0) {
+            // Save them to Firestore so we don't have to generate them again
+            for (const q of generatedQuestions) {
+              try {
+                const docRef = await addDoc(qRef, q);
+                qList.push({ id: docRef.id, ...q });
+              } catch (fsErr) {
+                console.error("Could not save to Firestore (likely security rules). Using temporarily:", fsErr);
+                qList.push({ id: 'temp-' + Math.random().toString(), ...q });
+              }
+            }
+          }
+        } catch (genErr) {
+          console.error("Dynamic generation failed", genErr);
+        }
+      }
+
+      // --- FINAL FALLBACK: Check local question bank if AI generation failed or didn't return enough ---
       if (qList.length < questionCount) {
         const bankQuestions = QUESTION_BANK.filter(q => {
           if (q.subject !== activeSubject) return false;
@@ -305,29 +329,6 @@ export default function MCQPractice() {
         const selectedFromBank = unseenBank.sort(() => Math.random() - 0.5).slice(0, needed);
         
         qList = [...qList, ...selectedFromBank];
-      }
-
-      // --- FINAL FALLBACK: Dynamic Generation (Gemini) ---
-      if (qList.length < questionCount) {
-        try {
-          const numToGenerate = questionCount - qList.length;
-          const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
-          
-          if (generatedQuestions.length > 0) {
-            // Save them to Firestore so we don't have to generate them again
-            for (const q of generatedQuestions) {
-              try {
-                const docRef = await addDoc(qRef, q);
-                qList.push({ id: docRef.id, ...q });
-              } catch (fsErr) {
-                console.error("Could not save to Firestore (likely security rules). Using temporarily:", fsErr);
-                qList.push({ id: 'temp-' + Math.random().toString(), ...q });
-              }
-            }
-          }
-        } catch (genErr) {
-          console.error("Dynamic generation failed", genErr);
-        }
       }
 
       if (qList.length === 0) {
