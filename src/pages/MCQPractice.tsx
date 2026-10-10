@@ -236,7 +236,6 @@ export default function MCQPractice() {
 
       // Target counts
       const specificTopicCount = selectedTopics.length > 0 ? Math.ceil(questionCount / 2) : 0;
-      const mixedTopicCount = questionCount - specificTopicCount;
 
       let qList: any[] = [];
       let bankQuestions = [...QUESTION_BANK];
@@ -255,7 +254,7 @@ export default function MCQPractice() {
       });
 
       // Filter out seen questions
-      let unseenBank = eligibleBank.filter(q => !progressIds.has(q.id));
+      let unseenBank = eligibleBank.filter(q => !progressIds.has(q.id!));
       if (unseenBank.length < questionCount) {
         // Fall back to reusing seen ones if we don't have enough unseen
         unseenBank = eligibleBank;
