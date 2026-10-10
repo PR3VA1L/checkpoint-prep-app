@@ -25,6 +25,7 @@ export default function StructuredPractice() {
   
   const [examData, setExamData] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('All');
 
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<any>(null);
@@ -48,7 +49,9 @@ export default function StructuredPractice() {
       }
 
       const bank = MOCK_EXAM_BANK[activeSubject] || [];
-      const unseenExams = bank.filter(exam => {
+      let unseenExams = bank.filter(exam => {
+        if (selectedDifficulty !== 'All' && exam.difficulty && exam.difficulty !== selectedDifficulty) return false;
+
         let hash = 0;
         const text = exam.comprehension?.passage || exam.writing?.instructions || '';
         for (let i = 0; i < text.length; i++) {
@@ -57,12 +60,20 @@ export default function StructuredPractice() {
         }
         return !seenExamHashes.has(hash);
       });
+      
+      // If we don't have unseen exams matching the difficulty, fallback to seen ones matching difficulty
+      if (unseenExams.length === 0) {
+          unseenExams = bank.filter(exam => {
+              if (selectedDifficulty !== 'All' && exam.difficulty && exam.difficulty !== selectedDifficulty) return false;
+              return true;
+          });
+      }
 
       let data;
       if (unseenExams.length > 0) {
         data = unseenExams[Math.floor(Math.random() * unseenExams.length)];
       } else {
-        data = await generateMockExam(activeSubject);
+        data = await generateMockExam(activeSubject, selectedDifficulty === 'All' ? 'Medium' : selectedDifficulty);
       }
 
       let hash = 0;
@@ -196,6 +207,29 @@ export default function StructuredPractice() {
         </div>
 
         <div className="glass-card" style={{ padding: '2.5rem' }}>
+
+          <div style={{ marginBottom: '2rem' }}>
+            <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem', fontWeight: 'bold' }}>Select Difficulty</h3>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {['All', 'Easy', 'Medium', 'Hard'].map(diff => (
+                <button
+                  key={diff}
+                  onClick={() => setSelectedDifficulty(diff)}
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '2rem',
+                    border: `2px solid ${selectedDifficulty === diff ? 'var(--primary)' : 'var(--border)'}`,
+                    background: selectedDifficulty === diff ? 'var(--primary-light)' : 'transparent',
+                    color: selectedDifficulty === diff ? 'var(--primary)' : 'var(--text-main)',
+                    fontWeight: selectedDifficulty === diff ? 'bold' : 'normal',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {diff}
+                </button>
+              ))}
+            </div>
+          </div>
           
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2.5rem' }}>
             <button 

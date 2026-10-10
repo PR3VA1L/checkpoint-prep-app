@@ -173,11 +173,12 @@ Do not use markdown formatting like \`\`\`json. Return raw JSON text only.`;
   }
 }
 
-export async function generateMockExam(subject: string) {
+export async function generateMockExam(subject: string, difficulty: string = 'Medium') {
   try {
     const prompt = `
 You are an expert Cambridge Primary Checkpoint Examiner for Subject: ${subject.toUpperCase()}.
 Generate a full mock exam tailored to Year 6 (11-year-olds) for this subject.
+Difficulty: ${difficulty}. If "Hard", questions must be exceptionally tricky, testing deep multi-step thinking.
 
 If subject is ENGLISH:
 Provide a reading comprehension passage (approx 200 words) and 5-7 questions worth 1-2 marks each.

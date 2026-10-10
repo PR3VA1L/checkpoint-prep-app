@@ -234,51 +234,61 @@ export default function MCQPractice() {
         }
       }
 
-      const qRef = collection(db, 'questions');
-      let qList: any[] = [];
-      
-      // FIX: Always filter by subject to avoid cross-subject contamination
-      const constraints: any[] = [where('subject', '==', activeSubject)];
-      
-      if (selectedTopics.length > 0) {
-        constraints.push(where('topic', 'in', selectedTopics));
-      }
-      
-      if (selectedDifficulty !== 'All') {
-        constraints.push(where('difficulty', '==', selectedDifficulty));
-      }
-      
-      try {
-        const q = query(qRef, ...constraints);
-        const querySnapshot = await getDocs(q);
-        qList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (fsErr) {
-        console.warn('Firestore query failed (possibly no index or empty collection). Falling back to question bank.', fsErr);
-      }
+      // Target counts
+      const specificTopicCount = selectedTopics.length > 0 ? Math.ceil(questionCount / 2) : 0;
+      const mixedTopicCount = questionCount - specificTopicCount;
 
-      // Shuffle the list to randomize questions pulled from the database
-      qList = qList.sort(() => Math.random() - 0.5);
+      let qList: any[] = [];
+      let bankQuestions = [...QUESTION_BANK];
+
+      // Add stable IDs to bank questions to check against progressIds
+      bankQuestions = bankQuestions.map((q, idx) => ({
+        ...q,
+        id: 'bank-' + activeSubject + '-' + idx + '-' + Math.abs(q.question.length)
+      }));
+
+      // Filter by subject and difficulty
+      let eligibleBank = bankQuestions.filter(q => {
+        if (q.subject.toLowerCase() !== activeSubject.toLowerCase()) return false;
+        if (selectedDifficulty !== 'All' && q.difficulty !== selectedDifficulty) return false;
+        return true;
+      });
 
       // Filter out seen questions
-      qList = qList.filter(q => !progressIds.has(q.id));
+      let unseenBank = eligibleBank.filter(q => !progressIds.has(q.id));
+      if (unseenBank.length < questionCount) {
+        // Fall back to reusing seen ones if we don't have enough unseen
+        unseenBank = eligibleBank;
+      }
 
-      // --- NEW PRIMARY: Dynamic Generation (Gemini) ---
-      // Always try to generate fresh questions first to ensure variety
+      // Shuffle unseen bank
+      unseenBank = unseenBank.sort(() => Math.random() - 0.5);
+
+      if (specificTopicCount > 0) {
+        const specificQs = unseenBank.filter(q => selectedTopics.includes(q.topic)).slice(0, specificTopicCount);
+        qList.push(...specificQs);
+        
+        // Remove picked questions so we don't pick them again for the mixed part
+        const pickedIds = new Set(specificQs.map(q => q.id));
+        unseenBank = unseenBank.filter(q => !pickedIds.has(q.id));
+      }
+
+      // Fill the rest with mixed topics
+      const needed = questionCount - qList.length;
+      if (needed > 0) {
+        qList.push(...unseenBank.slice(0, needed));
+      }
+
+      // --- FINAL FALLBACK: Dynamic Generation (Gemini) ---
+      // Only if we somehow don't have enough in the 900+ question bank
       if (qList.length < questionCount) {
         try {
           const numToGenerate = questionCount - qList.length;
           const generatedQuestions = await generateMCQQuestions(activeSubject, selectedTopics, selectedDifficulty, numToGenerate, vocabLevel);
           
           if (generatedQuestions.length > 0) {
-            // Save them to Firestore so we don't have to generate them again
             for (const q of generatedQuestions) {
-              try {
-                const docRef = await addDoc(qRef, q);
-                qList.push({ id: docRef.id, ...q });
-              } catch (fsErr) {
-                console.error("Could not save to Firestore (likely security rules). Using temporarily:", fsErr);
-                qList.push({ id: 'temp-' + Math.random().toString(), ...q });
-              }
+              qList.push({ id: 'temp-' + Math.random().toString(), ...q });
             }
           }
         } catch (genErr) {
@@ -286,58 +296,13 @@ export default function MCQPractice() {
         }
       }
 
-      // --- FINAL FALLBACK: Check local question bank if AI generation failed or didn't return enough ---
-      if (qList.length < questionCount) {
-        const bankQuestions = QUESTION_BANK.filter(q => {
-          if (q.subject !== activeSubject) return false;
-          if (selectedTopics.length > 0 && !selectedTopics.includes(q.topic)) return false;
-          if (selectedDifficulty !== 'All' && q.difficulty !== selectedDifficulty) return false;
-          // Ensure it's not already in qList
-          return !qList.some(existingQ => existingQ.question === q.question);
-        });
-        
-        // Add stable IDs to bank questions to check against progressIds
-        const formattedBank = bankQuestions.map(q => {
-          let hash = 0;
-          for (let i = 0; i < q.question.length; i++) {
-            hash = (hash << 5) - hash + q.question.charCodeAt(i);
-            hash &= hash;
-          }
-          return {
-            ...q,
-            id: 'bank-' + Math.abs(hash).toString(36)
-          };
-        });
-        
-        // Filter out seen questions
-        let unseenBank = formattedBank.filter(q => !progressIds.has(q.id));
-        
-        // If we don't have enough unseen, fall back to reusing seen ones
-        if (unseenBank.length < (questionCount - qList.length)) {
-           const seenBank = formattedBank.filter(q => progressIds.has(q.id));
-           unseenBank = [...unseenBank, ...seenBank];
-        }
-
-        // --- SECOND FALLBACK: Drop Topic Filter if STILL not enough ---
-        if (unseenBank.length < (questionCount - qList.length) && selectedTopics.length > 0) {
-           const broaderBank = QUESTION_BANK.filter(q => q.subject === activeSubject && q.difficulty === selectedDifficulty);
-           const formattedBroader = broaderBank.map((q, idx) => ({ ...q, id: 'broader-' + idx }));
-           unseenBank = [...unseenBank, ...formattedBroader];
-        }
-
-        const needed = questionCount - qList.length;
-        const selectedFromBank = unseenBank.sort(() => Math.random() - 0.5).slice(0, needed);
-        
-        qList = [...qList, ...selectedFromBank];
-      }
-
       if (qList.length === 0) {
-        setErrorMsg('No questions found and dynamic generation failed. Please check your AI API key.');
+        setErrorMsg('No questions found. Please check your internet connection.');
         setLoading(false);
         return;
       }
 
-      // If we got more questions from the database than requested, shuffle again and trim down
+      // Final shuffle to mix the specific and mixed topic questions
       qList = qList.sort(() => Math.random() - 0.5).slice(0, questionCount);
 
       setQuestions(qList);
