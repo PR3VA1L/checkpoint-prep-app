@@ -8,7 +8,7 @@ import { collection, addDoc, Timestamp, getDocs, query, where } from 'firebase/f
 import { MOCK_EXAM_BANK } from '../data/mockExamBank';
 
 
-export default function WrittenPractice() {
+export default function StructuredPractice() {
   const { subject } = useParams<{ subject: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -153,7 +153,7 @@ export default function WrittenPractice() {
           examHash: examData.hash || null,
           timestamp: Timestamp.now(),
           durationSeconds,
-          topics: ['Written Practice']
+          topics: ['Structured Practice']
         }).catch(console.error);
       }
     } catch (error: any) {
@@ -176,7 +176,7 @@ export default function WrittenPractice() {
           {['english', 'math', 'science'].map(sub => (
             <button
               key={sub}
-              onClick={() => navigate(`/practice/written/${sub}`)}
+              onClick={() => navigate(`/practice/structured/${sub}`)}
               style={{
                 padding: '0.75rem 1.5rem',
                 borderRadius: '1rem',
@@ -268,7 +268,7 @@ export default function WrittenPractice() {
             <div style={{ flex: 1 }}>
               {examData.comprehension.questions.map((q: any) => (
                 <div key={q.id} style={{ marginBottom: '2rem' }}>
-                  <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem' }}>
+                  <p style={{ fontWeight: 'bold', marginBottom: '0.5rem', fontSize: '1.1rem', whiteSpace: 'pre-wrap' }}>
                     {q.id}. {q.text} <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 'normal' }}>[{q.marks} {q.marks === 1 ? 'mark' : 'marks'}]</span>
                   </p>
                   <textarea

@@ -187,23 +187,25 @@ If subject is MATH:
 Generate 15-20 short-answer questions structured EXACTLY like a Cambridge Primary Checkpoint Mathematics Paper 1. 
 Questions should be varied (e.g. calculation, ordering fractions, completing sequences, basic geometry, mental math).
 Each question should be worth 1 or 2 marks. Provide them as an array of questions.
+CRITICAL: Do NOT provide a "passage" or "scenario" paragraph for Math. The "passage" field MUST be null.
 
 If subject is SCIENCE:
 Generate 6-8 structured questions EXACTLY like a Cambridge Primary Checkpoint Science Paper.
 Each question MUST have multiple parts (e.g. 1a, 1b, 1c) revolving around a single structured scenario, experiment, or diagram description. 
 DO NOT use the topic "Waves" (it is not Year 6).
+CRITICAL: Do NOT provide a "passage" or general paragraph for Science. The "passage" field MUST be null. Put any scenario text directly into the specific question's "text" field, using \n for line breaks.
 
 OUTPUT STRICTLY IN JSON FORMAT matching this exact interface:
 {
   "comprehension": {
     "title": "string (or 'Math Paper' / 'Science Paper')",
-    "passage": "string (the story, or the general instructions/scenario for the math/science paper)",
+    "passage": "string (the story for English, MUST BE null for Math and Science)",
     "questions": [
-      { "id": number, "text": "string (For Science, include the full multi-part question text like '1(a) ... 1(b) ...')", "marks": number }
+      { "id": number, "text": "string (For Science/Math, include the full multi-part question text and scenarios here, use \n for line breaks)", "marks": number }
     ]
   },
   "writing": {
-    "instructions": "string (the prompt for the long form answer, or null if it's a Math/Science exam that only has short answers)"
+    "instructions": "string (the prompt for the long form answer, or null if it's a Math/Science exam)"
   }
 }
 

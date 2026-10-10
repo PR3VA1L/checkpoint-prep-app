@@ -4,7 +4,7 @@ import ParentLayout from './components/ParentLayout';
 import ParentDashboard from './pages/ParentDashboard';
 import Dashboard from './pages/Dashboard';
 import MCQPractice from './pages/MCQPractice';
-import WrittenPractice from './pages/WrittenPractice';
+import StructuredPractice from './pages/StructuredPractice';
 import ExamSimulator from './pages/ExamSimulator';
 import Auth from './pages/Auth';
 import History from './pages/History';
@@ -50,9 +50,9 @@ function App() {
                 <MCQPractice />
               </ProtectedRoute>
             } />
-            <Route path="practice/written/:subject" element={
+            <Route path="practice/structured/:subject" element={
               <ProtectedRoute allowedRole="student">
-                <WrittenPractice />
+                <StructuredPractice />
               </ProtectedRoute>
             } />
             <Route path="practice/exam/:subject" element={
@@ -61,7 +61,7 @@ function App() {
               </ProtectedRoute>
             } />
             <Route path="practice/mcq" element={<Navigate to="english" replace />} />
-            <Route path="practice/written" element={<Navigate to="english" replace />} />
+            <Route path="practice/structured" element={<Navigate to="english" replace />} />
             <Route path="practice/exam" element={<Navigate to="english" replace />} />
             <Route path="contact" element={
               <ProtectedRoute allowedRole="student">

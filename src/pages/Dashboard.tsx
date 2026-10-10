@@ -312,7 +312,7 @@ export default function Dashboard() {
             <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
               {selectedSubject === 'english' ? 'Write or upload handwritten tasks, graded instantly by AI.' : 'Solve problems or upload working, graded instantly by AI.'}
             </p>
-            <Link to={`/practice/written/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
+            <Link to={`/practice/structured/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
               {selectedSubject === 'english' ? 'Start Writing' : 'Start Paper'}
             </Link>
           </div>
