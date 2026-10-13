@@ -1,5 +1,5 @@
 import type { Family, Question, Part, Difficulty, Diagram } from "./types";
-import { num } from "./random";
+import { num } from "./random.js";
 const part = (
   id: string,
   text: string,

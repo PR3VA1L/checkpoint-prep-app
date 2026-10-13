@@ -6,17 +6,17 @@ import type {
   Attempt,
   Answer,
 } from "./types";
-import { MATH_FAMILIES } from "./math";
-import { SCIENCE_FAMILIES } from "./science";
+import { MATH_FAMILIES } from "./math.js";
+import { SCIENCE_FAMILIES } from "./science.js";
 import {
   ENGLISH_FAMILIES,
   READINGS,
   readingQuestion,
   writingTask,
-} from "./english";
-import { shuffle, futureDay } from "./random";
-import { EXTENSION_FAMILIES } from "./extension";
-import { CHALLENGE_FAMILIES } from "./challenge";
+} from "./english.js";
+import { shuffle, futureDay } from "./random.js";
+import { EXTENSION_FAMILIES } from "./extension.js";
+import { CHALLENGE_FAMILIES } from "./challenge.js";
 export const FAMILIES = [
   ...MATH_FAMILIES,
   ...SCIENCE_FAMILIES,

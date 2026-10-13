@@ -1,5 +1,5 @@
-import { make } from "./math";
-import { family } from "./science";
+import { make } from "./math.js";
+import { family } from "./science.js";
 import type { Family, Question, Difficulty } from "./types";
 
 // Stage 6 challenge items require several linked steps or careful use of evidence.

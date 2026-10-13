@@ -1,7 +1,7 @@
-import { make } from "./math";
-import { family } from "./science";
+import { make } from "./math.js";
+import { family } from "./science.js";
 import type { Family } from "./types";
-import { num } from "./random";
+import { num } from "./random.js";
 const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
 const frac = (a: number, b: number) => {
   const g = gcd(a, b);

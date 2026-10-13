@@ -1,5 +1,5 @@
 import type { Family, Question, Difficulty, Part } from "./types";
-import { passageParts } from "./readingDetails";
+import { passageParts } from "./readingDetails.js";
 const names = [
   "Maya",
   "Leo",

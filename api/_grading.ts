@@ -1,5 +1,5 @@
-import { FAMILIES, fingerprint } from "../src/learning/engine";
-import { READINGS, readingQuestion } from "../src/learning/english";
+import { FAMILIES, fingerprint } from "../src/learning/engine.js";
+import { READINGS, readingQuestion } from "../src/learning/english.js";
 import type { Attempt, Part, Question, Answer } from "../src/learning/types";
 
 export const MARK_SCHEME_VERSION = "checkpoint-authored-v2";
