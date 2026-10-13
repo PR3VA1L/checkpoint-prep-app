@@ -23,6 +23,7 @@ import { reviewedResult } from "../learning/marking";
 import { requestAutomaticMark } from "../lib/markingApi";
 import QuestionDiagram from "../components/QuestionDiagram";
 import FloatingCalculator from "../components/FloatingCalculator";
+import { usefulHint } from "../learning/hints";
 
 export default function Practice({
   mode = "mcq",
@@ -62,13 +63,31 @@ function PracticeSubject({
     [note, setNote] = useState(""),
     [index, setIndex] = useState(0),
     [selected, setSelected] = useState(""),
+    [firstWrong, setFirstWrong] = useState<string | null>(null),
     [hint, setHint] = useState(false),
+    [cheersOn, setCheersOn] = useState(false),
     [now, setNow] = useState(() => Date.now()),
+    [activeSeconds, setActiveSeconds] = useState(0),
     [cloudSaved, setCloudSaved] = useState(false);
   const current = useRef<Attempt | null>(null),
     lock = useRef(false),
     heading = useRef<HTMLHeadingElement>(null);
   const active=attempt?.status==='active',deadline=attempt?.deadline;
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => {
+      if (document.hidden || !document.hasFocus()) return;
+      const a = current.current;
+      if (!a || a.status !== "active") return;
+      a.durationSeconds = (a.durationSeconds || 0) + 1;
+      setActiveSeconds(a.durationSeconds);
+      if (a.durationSeconds % 15 === 0) {
+        a.updatedAt = Date.now();
+        saveDraft(uid, a);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [active, uid]);
   function update(a: Attempt) {
     a = { ...a, updatedAt: Date.now() };
     current.current = a;
@@ -98,6 +117,7 @@ function PracticeSubject({
             else setCloudSaved(true);
             current.current = a;
             setAttempt(a);
+            setActiveSeconds(a.durationSeconds || 0);
           }
         }
       })
@@ -141,6 +161,7 @@ function PracticeSubject({
             : draft;
         current.current = recovered;
         setAttempt(recovered);
+        setActiveSeconds(recovered.durationSeconds || 0);
         setCloudSaved(recovered === cloud);
         setNote(
           recovered.status === "completed"
@@ -212,13 +233,18 @@ function PracticeSubject({
     if (!a || selected === "" || lock.current) return;
     const q = a.questions[index];
     if (a.answers[q.id]) return;
+    if (firstWrong === null && Number(selected) !== q.correctIndex) {
+      setFirstWrong(selected);
+      setSelected("");
+      return;
+    }
     lock.current = true;
     setBusy(true);
     setError("");
     const answer: Answer = {
       value: selected,
       hint,
-      score: Number(Number(selected) === q.correctIndex),
+      score: Number(firstWrong === null && Number(selected) === q.correctIndex),
       max: 1,
       topic: q.topic,
       family: q.family,
@@ -226,6 +252,25 @@ function PracticeSubject({
     const answers = { ...a.answers, [q.id]: answer };
     const next = { ...a, answers, score: scoreAnswers(answers).score };
     const saved = update(next);
+    if (answer.score) {
+      let streak = 1;
+      for (let n = index - 1; n >= 0; n--) {
+        const previous = a.answers[a.questions[n].id];
+        if (!previous || previous.score !== 1) break;
+        streak++;
+      }
+      if (streak === 3 || streak === 5 || (streak > 5 && streak % 5 === 0)) {
+        void import("canvas-confetti").then(({ default: confetti }) =>
+          confetti({ particleCount: streak >= 5 ? 90 : 45, spread: 60, origin: { y: 0.65 }, disableForReducedMotion: true }),
+        );
+        if (cheersOn && "speechSynthesis" in window) {
+          const cheer = new SpeechSynthesisUtterance(streak >= 5 ? "Godlike!" : "Sensational!");
+          cheer.pitch = 0.6;
+          cheer.rate = 0.9;
+          window.speechSynthesis.speak(cheer);
+        }
+      }
+    }
     try {
       await sync(saved, [q]);
     } catch {
@@ -260,12 +305,7 @@ function PracticeSubject({
       answers,
       status: "completed",
       completedAt: Date.now(),
-      durationSeconds: Math.max(
-        0,
-        Math.round(
-          (Math.min(Date.now(), a.deadline || Date.now()) - a.startedAt) / 1000,
-        ),
-      ),
+      durationSeconds: a.durationSeconds || 0,
       score: scoreAnswers(answers).score,
       grading: a.mode === "mcq" ? "automatic" : "awaiting-review",
     };
@@ -292,6 +332,7 @@ function PracticeSubject({
     const result = await requestAutomaticMark(attemptId);
     current.current = result.attempt;
     setAttempt(result.attempt);
+    setActiveSeconds(result.attempt.durationSeconds || 0);
     setCloudSaved(true);
     if (result.pending)
       setNote(
@@ -865,8 +906,10 @@ function PracticeSubject({
               onClick={() => {
                 current.current = null;
                 setAttempt(null);
+                setActiveSeconds(0);
                 setIndex(0);
                 setSelected("");
+                setFirstWrong(null);
                 setHint(false);
                 setNote("");
               }}
@@ -878,6 +921,8 @@ function PracticeSubject({
       ) : mcq ? (
         <>
           <section className="panel question-card">
+            <label className="check"><input type="checkbox" checked={cheersOn} onChange={(event) => setCheersOn(event.target.checked)} /> Victory voice (optional)</label>
+            <p className="muted">Active question time: {Math.floor(activeSeconds / 60)}m {activeSeconds % 60}s · pauses when this tab is in the background</p>
             <span className="badge">
               {TOPICS[subject][q.topic]} · {q.objective}
             </span>
@@ -886,7 +931,7 @@ function PracticeSubject({
             <div className="options">
               {q.options.map((option, i) => (
                 <button
-                  className={`option ${(answer?.value ?? selected) === String(i) ? "selected" : ""}`}
+                  className={`option ${(answer?.value ?? selected) === String(i) ? "selected" : ""} ${firstWrong === String(i) ? "wrong-choice" : ""}`}
                   aria-pressed={(answer?.value ?? selected) === String(i)}
                   disabled={!!answer || busy}
                   key={option}
@@ -897,7 +942,14 @@ function PracticeSubject({
                 </button>
               ))}
             </div>
-            {hint && <p className="notice">{q.hint}</p>}
+            {hint && <p className="notice">{usefulHint(q)}</p>}
+            {firstWrong !== null && !answer && (
+              <div className="feedback incorrect" role="alert">
+                <h3>Not quite—try once more.</h3>
+                <p>{q.explanation}</p>
+                <p>Choose a different answer. Your first choice is shown in red.</p>
+              </div>
+            )}
             {answer && (
               <div className="feedback" role="status">
                 <h3>
@@ -906,6 +958,7 @@ function PracticeSubject({
                     : "Let’s work through it."}
                 </h3>
                 <p>{q.explanation}</p>
+                {!answer.score && <p>Correct answer: {q.options[q.correctIndex]}</p>}
                 {!answer.score && (
                   <p>
                     A different version of this skill will be scheduled 2–7 days
@@ -932,6 +985,7 @@ function PracticeSubject({
                     else {
                       setIndex(index + 1);
                       setSelected("");
+                      setFirstWrong(null);
                       setHint(false);
                     }
                   }}
@@ -1054,7 +1108,7 @@ function PracticeSubject({
         </>
       )}
       {!completed &&
-        ((mcq && subject !== "english") ||
+        ((mcq && (subject === "science" || (subject === "math" && q?.calculatorAllowed))) ||
           (!mcq && paperPolicy(subject, attempt.paper).calculator)) && (
           <FloatingCalculator />
         )}

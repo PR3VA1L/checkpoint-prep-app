@@ -108,5 +108,10 @@ export const ENGLISH_EXTRA_FAMILIES = [
   family("vocabulary-extra", "vocabulary", "6Rv.01", vocabulary.length, question(vocabulary, ["What does the key word mean here?", "Which meaning fits the surrounding detail?", "Which meaning is supported by the context rather than by a different use of the word?"])),
   family("effect-extra", "language", "6Rv.06", language.length, question(language, ["What does this wording suggest?", "What effect does the image have?", "Which explanation connects a particular word to its effect on the reader?"])),
   family("subordinate-extra", "grammar", "6Rg.02", grammar.length, question(grammar, ["Which group of words is a dependent clause?", "Which clause cannot stand alone in this sentence?", "Which clause adds time, reason, condition or contrast to the main clause?"])),
-  family("punctuation-extra", "punctuation", "6Rg.01", punctuation.length, question(punctuation, ["What is the punctuation doing?", "Which explanation best fits its use here?", "Which explanation refers to the exact job of the punctuation in this sentence?"])),
+  family("punctuation-extra", "punctuation", "6Rg.01", punctuation.length, (v, d) => {
+    const [extract, answer, a, b, c, reason] = punctuation[v];
+    const target = /colon/i.test(answer) ? "colon (:)" : /semicolon/i.test(answer) ? "semicolon (;)" : /apostrophe/i.test(answer) ? "apostrophe (')" : /question mark/i.test(answer) ? "question mark (?)" : /exclamation mark/i.test(answer) ? "exclamation mark (!)" : /dashes|dash/i.test(answer) ? "dash (—)" : "comma (,)";
+    const prompt = d === "Easy" ? `What does the ${target} do in this sentence?` : d === "Medium" ? `Which explanation best describes the use of the ${target} in this sentence?` : `Which explanation describes the exact job of the ${target} in this sentence?`;
+    return [`${extract} ${prompt}`, answer, [a, b, c], reason];
+  }),
 ];

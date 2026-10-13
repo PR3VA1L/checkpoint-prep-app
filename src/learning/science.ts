@@ -3,6 +3,7 @@ interface Scenario {
   context: string;
   question: string;
   answer: string;
+  exact?: string[];
   wrong: string[];
   why: string;
   follow: string;
@@ -30,6 +31,7 @@ export function family(
           text: q.question,
           marks: 1,
           answer: q.answer,
+          ...(q.exact ? { exact: q.exact } : {}),
           guidance: q.why,
           ...(id === "evaporation" && d === "Medium" ? {
             markPoints: [{ alternatives: [
@@ -219,10 +221,10 @@ export const SCIENCE_FAMILIES: Family[] = [
         kind: "foodweb",
         nodes: n,
         edges: [
-          [0, 1],
-          [1, 2],
-          [2, 3],
-          [1, 4],
+          { from: 0, to: 1 },
+          { from: 1, to: 2 },
+          { from: 2, to: 3 },
+          { from: 1, to: 4 },
         ],
       },
     };
@@ -502,6 +504,7 @@ export const SCIENCE_FAMILIES: Family[] = [
             ? "Which rock group does this evidence support?"
             : "A pupil classifies this rock by colour alone. Which classification is supported by how it formed?",
       answer: names[v],
+      exact: [`${names[v]} rock`],
       wrong: [
         ...names.filter((n) => n !== names[v]),
         "All rocks form in exactly the same way.",

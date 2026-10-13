@@ -620,6 +620,12 @@ code {
   border: 2px solid var(--primary);
   background: var(--soft);
 }
+.option.wrong-choice,
+.option.wrong-choice.selected {
+  border: 2px solid #bb3030;
+  background: #fff0f0;
+  color: #761919;
+}
 .option:disabled {
   opacity: 1;
 }
@@ -628,6 +634,10 @@ code {
   padding: 12px 18px;
   margin: 18px 0;
   background: var(--soft);
+}
+.feedback.incorrect {
+  border-left-color: #bb3030;
+  background: #fff0f0;
 }
 .feedback p:last-child {
   margin-bottom: 0;

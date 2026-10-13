@@ -146,7 +146,7 @@ export const CHALLENGE_FAMILIES: Family[] = [
       why: `The web shows two food sources for ${predator}: ${prey} and ${other}. Fewer ${prey} could affect the predator, but the web does not prove that all of them will die.`,
       follow: `What other food source for ${predator} is shown?`,
       followAnswer: other,
-      diagram: { kind: "foodweb", nodes: ["plants", prey, other, predator], edges: [[0, 1], [0, 2], [1, 3], [2, 3]] },
+      diagram: { kind: "foodweb", nodes: ["plants", prey, other, predator], edges: [{ from: 0, to: 1 }, { from: 0, to: 2 }, { from: 1, to: 3 }, { from: 2, to: 3 }] },
     };
   }),
   englishChallenge,

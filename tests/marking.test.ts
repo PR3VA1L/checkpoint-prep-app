@@ -82,6 +82,14 @@ test("an authored science alternative is marked without trusting a bare keyword"
   assert.equal(ruleMark(q.parts[0], "Evaporation").method, "pending");
 });
 
+test("rock group names accept the equivalent answer with rock appended", () => {
+  const rock = FAMILIES.find((f) => f.id === "rock-cycle")!;
+  for (let variant = 0; variant < rock.variants; variant++) {
+    const part = rock.make(variant, "Easy", 1).parts[0];
+    assert.equal(ruleMark(part, `${part.answer} rock`).score, 1);
+  }
+});
+
 test("optional Cloudflare marker uses a server-side token and validates marks", async () => {
   const prior = {
     enabled: process.env.MARKER_AI_ENABLED, provider: process.env.MARKER_PROVIDER,

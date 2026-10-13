@@ -197,7 +197,7 @@ export const EXTENSION_FAMILIES: Family[] = [
       answer,
       wrong: [`(${x}, ${y})`, `(${-x}, ${-y})`, `(${x + 2}, ${y - 3})`],
       explanation: `Reflection in the y-axis reverses x; reflection in the x-axis reverses y.${d === "Hard" ? ` First get (${-x}, ${y}); then add 2 to x and subtract 3 from y.` : ""} The answer is ${answer}.`,
-      diagram: { kind: "grid", points: [[x, y, "A"]] },
+      diagram: { kind: "grid", points: [{ x, y, label: "A" }] },
     };
   }),
   make("median-change", "statistics", "6Ss.03", (v, d) => {

@@ -201,10 +201,10 @@ export default function QuestionDiagram({ diagram: d }: { diagram: Diagram }) {
         <svg
           viewBox="0 0 470 270"
           role="img"
-          aria-label={`Food web. Arrows: ${d.edges.map(([a, b]) => `${d.nodes[a]} to ${d.nodes[b]}`).join("; ")}`}
+          aria-label={`Food web. Arrows: ${d.edges.map(({ from, to }) => `${d.nodes[from]} to ${d.nodes[to]}`).join("; ")}`}
         >
           {arrow}
-          {d.edges.map(([a, b], i) => (
+          {d.edges.map(({ from: a, to: b }, i) => (
             <line
               key={i}
               x1={pos[a][0] + 18}
@@ -243,7 +243,7 @@ export default function QuestionDiagram({ diagram: d }: { diagram: Diagram }) {
     );
   }
   if (d.kind === "grid") {
-    const coords = d.points.map(([x, y]) => Math.max(Math.abs(x), Math.abs(y))),
+    const coords = d.points.map(({ x, y }) => Math.max(Math.abs(x), Math.abs(y))),
       range = Math.max(8, ...coords),
       scale = 170 / range;
     return (
@@ -252,7 +252,7 @@ export default function QuestionDiagram({ diagram: d }: { diagram: Diagram }) {
           viewBox="0 0 400 400"
           role="img"
           aria-label={d.points
-            .map(([x, y, label]) => `${label} at (${x}, ${y})`)
+            .map(({ x, y, label }) => `${label} at (${x}, ${y})`)
             .join("; ")}
         >
           {Array.from({ length: range * 2 + 1 }, (_, i) => i - range).map(
@@ -285,7 +285,7 @@ export default function QuestionDiagram({ diagram: d }: { diagram: Diagram }) {
               </g>
             ),
           )}
-          {d.points.map(([x, y, l]) => (
+          {d.points.map(({ x, y, label: l }) => (
             <g key={l}>
               <circle
                 cx={200 + x * scale}

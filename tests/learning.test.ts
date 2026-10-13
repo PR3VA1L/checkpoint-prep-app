@@ -21,6 +21,8 @@ import {
 } from "../src/learning/english";
 import { reviewedResult } from "../src/learning/marking";
 import { calculate } from "../src/learning/calculator";
+import { levelFor, subjectProgress } from "../src/learning/levels";
+import { usefulHint } from "../src/learning/hints";
 import type {
   Attempt,
   Selection,
@@ -57,6 +59,11 @@ test("every authored variant: four unique options, valid key, exact two-mark str
           assert.ok(q.options[q.correctIndex]);
           assert.ok(q.explanation.length > 10, f.id);
           assert.ok(q.stem.length > 10, f.id);
+          const nestedArray = (value: unknown): boolean => {
+            if (Array.isArray(value)) return value.some((item) => Array.isArray(item) || nestedArray(item));
+            return !!value && typeof value === "object" && Object.values(value).some(nestedArray);
+          };
+          assert.equal(nestedArray(q), false, `${f.id}: Firestore cannot store arrays directly inside arrays`);
           assert.ok(TOPICS[q.subject][q.topic], f.id);
           assert.ok(q.objective.startsWith("6"));
           if (q.subject !== "english")
@@ -101,6 +108,22 @@ test("structured bank meets the subject minimums", () => {
   assert.ok(readingParts.size >= 20, "English needs 20 passage-based structured questions");
   totals.english = readingParts.size;
   console.log("Structured question groups/parts:", totals);
+});
+test("punctuation asks about the named mark and hints give a concrete step", () => {
+  const f = FAMILIES.find((item) => item.id === "punctuation-extra")!;
+  const colon = f.make(9, "Medium", 1);
+  assert.match(colon.stem, /colon \(:\)/);
+  assert.match(usefulHint(colon), /named punctuation mark/);
+});
+test("math MCQs mix calculator and no-calculator questions", () => {
+  const questions = selectQuestions(config("math", { count: 10 }), [], [], "2026-10-13", seeded(42));
+  assert.ok(questions.some((q) => q.calculatorAllowed));
+  assert.ok(questions.some((q) => !q.calculatorAllowed));
+});
+test("levels require both practice and accuracy", () => {
+  assert.equal(levelFor({ count: 100, score: 20, total: 100 }), 1);
+  assert.equal(levelFor({ count: 50, score: 45, total: 50 }), 5);
+  assert.deepEqual(subjectProgress({ "math:number": { count: 2, score: 1, total: 2 }, "science:light": { count: 4, score: 3, total: 4 } }, "math"), { count: 2, score: 1, total: 2 });
 });
 test("at least thirty successive broad-topic sessions contain no repeated question", () => {
   for (const subject of ["math", "science", "english"] as const) {

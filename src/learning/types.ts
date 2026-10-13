@@ -4,10 +4,10 @@ export type Diagram =
   | { kind: "bars"; labels: string[]; values: number[]; unit: string }
   | { kind: "triangle"; base: number; height: number }
   | { kind: "rectangle"; width: number; height: number }
-  | { kind: "foodweb"; nodes: string[]; edges: [number, number][] }
+  | { kind: "foodweb"; nodes: string[]; edges: { from: number; to: number }[] }
   | { kind: "forces"; left: number; right: number }
   | { kind: "circuit"; parallel: boolean; open: boolean }
-  | { kind: "grid"; points: [number, number, string][] };
+  | { kind: "grid"; points: { x: number; y: number; label: string }[] };
 export interface Part {
   id: string;
   text: string;
@@ -35,6 +35,7 @@ export interface Question {
   context: string;
   parts: Part[];
   diagram?: Diagram;
+  calculatorAllowed?: boolean;
 }
 export interface Family {
   id: string;

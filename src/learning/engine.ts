@@ -34,7 +34,11 @@ export function fingerprint(q: Question) {
   const text = JSON.stringify([
     q.subject,
     q.stem.replace(/\s+/g, " ").trim(),
-    q.diagram || null,
+    q.diagram?.kind === "foodweb"
+      ? { ...q.diagram, edges: q.diagram.edges.map(({ from, to }) => [from, to]) }
+      : q.diagram?.kind === "grid"
+        ? { ...q.diagram, points: q.diagram.points.map(({ x, y, label }) => [x, y, label]) }
+        : q.diagram || null,
   ]);
   let a = 2166136261,
     b = 5381;
@@ -136,7 +140,12 @@ export function selectQuestions(
       const pool = ordered.shift()!;
       while (pool.variants.length) {
         const { variant, difficulty } = pool.variants.pop()!;
-        const q = pool.f.make(variant, difficulty, config.paper);
+        const questionPaper = config.mode === "mcq" && config.subject === "math"
+          ? (selected.length % 2 === 0 ? 1 : 2)
+          : config.paper;
+        const q = pool.f.make(variant, difficulty, questionPaper);
+        if (config.mode === "mcq" && config.subject === "math")
+          q.calculatorAllowed = questionPaper === 2;
         q.id = fingerprint(q);
         if (excluded.has(q.id)) continue;
         excluded.add(q.id);

@@ -12,10 +12,12 @@ import { dayKey, futureDay } from "../learning/random";
 import type { Subject, Review } from "../learning/types";
 import Activity from "../components/Activity";
 import { accountAction } from "../lib/account";
+import { levelFor, LEVEL_TITLES, subjectProgress } from "../learning/levels";
 export default function Dashboard() {
   const { user, profile } = useAuth(),
     { data, loading, error } = useAttempts(user?.uid);
-  const [subject, setSubject] = useState<Subject>("english"),
+  const [subject, setSubject] = useState<Subject | "all">("all"),
+    [parentNames, setParentNames] = useState<Record<string, string>>({}),
     [reviews, setReviews] = useState<Review[]>([]),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -31,8 +33,18 @@ export default function Dashboard() {
       () => setMessage("Review schedule could not be loaded."),
     );
   }, [user]);
-  const filtered = data.filter((a) => a.subject === subject),
+  useEffect(() => {
+    if (!profile?.linkedParents?.length) return;
+    let live = true;
+    void accountAction({ action: "links" }).then((result) => {
+      if (live) setParentNames(Object.fromEntries((result.links || []).map((link: {id: string; name: string}) => [link.id, link.name])));
+    }).catch(() => setMessage("Linked parent names could not be loaded."));
+    return () => { live = false; };
+  }, [profile?.linkedParents]);
+  const filtered = subject === "all" ? data : data.filter((a) => a.subject === subject),
+    practiceSubject = subject === "all" ? data[0]?.subject || "english" : subject,
     stats = summarise(filtered),
+    allStats = summarise(data),
     due = reviews.filter(
       (r) => r.due <= today && r.lastDay !== today && r.correct === 0,
     ).length;
@@ -92,13 +104,13 @@ export default function Dashboard() {
         </p>
       )}
       <nav className="subject-tabs" aria-label="Dashboard subject">
-        {(["english", "math", "science"] as const).map((s) => (
+        {(["all", "english", "math", "science"] as const).map((s) => (
           <button
             aria-pressed={subject === s}
             key={s}
             onClick={() => setSubject(s)}
           >
-            {subjectName(s)}
+            {s === "all" ? "All subjects" : subjectName(s)}
           </button>
         ))}
       </nav>
@@ -110,10 +122,10 @@ export default function Dashboard() {
             <br />a new discovery.
           </h2>
           <p>
-            Try a fresh {subjectName(subject)} question. Mistakes become a later
+            Try a fresh {subjectName(practiceSubject)} question. Mistakes become a later
             review—not today’s repetition.
           </p>
-          <Link className="button" to={`/practice/mcq/${subject}`}>
+          <Link className="button" to={`/practice/mcq/${practiceSubject}`}>
             Start quick practice <ArrowUpRight size={19} />
           </Link>
         </div>
@@ -127,6 +139,10 @@ export default function Dashboard() {
         </div>
       </section>
       <section className="stats-grid" aria-label="Recent activity">
+        <div className="stat">
+          <strong>{loading ? "—" : `${Math.floor(filtered.reduce((sum, a) => sum + (a.durationSeconds || 0), 0) / 60)}m`}</strong>
+          <span>Active question time</span>
+        </div>
         <div className="stat">
           <BookOpen />
           <strong>{loading ? "—" : stats.questions}</strong>
@@ -153,11 +169,27 @@ export default function Dashboard() {
           <span>Sessions awaiting review</span>
         </div>
       </section>
+      <section className="panel">
+        <h2>Your levels</h2>
+        <p className="muted">Levels grow through marked practice and accuracy. Unmarked work does not count yet.</p>
+        {(["english", "math", "science"] as const).map((name) => {
+          const row = subjectProgress(allStats.topics, name);
+          const level = levelFor(row);
+          return <div className="focus-row" key={name}><span>{subjectName(name)}</span><strong>Level {level} · {LEVEL_TITLES[level - 1]} <small>({row.count} responses)</small></strong></div>;
+        })}
+        <details><summary>Topic levels</summary>
+          {Object.entries(allStats.topics).map(([key, row]) => {
+            const [name, topic] = key.split(":") as [Subject, string];
+            const level = levelFor(row);
+            return <div className="focus-row" key={key}><span>{subjectName(name)} · {TOPICS[name]?.[topic] || topic}</span><strong>Level {level} · {LEVEL_TITLES[level - 1]}</strong></div>;
+          })}
+        </details>
+      </section>
       <div className="two-columns">
         <section className="panel">
           <div className="section-title">
             <h2>Practice with a purpose</h2>
-            <span className="badge">{subjectName(subject)}</span>
+            <span className="badge">{subjectName(practiceSubject)}</span>
           </div>
           <p>
             Choose Paper 1 or Paper 2, your topics and your level. Show your
@@ -165,7 +197,7 @@ export default function Dashboard() {
           </p>
           <Link
             className="button secondary"
-            to={`/practice/structured/${subject}`}
+            to={`/practice/structured/${practiceSubject}`}
           >
             Build structured practice →
           </Link>
@@ -177,7 +209,7 @@ export default function Dashboard() {
             .map(([key, r]) => (
               <div className="focus-row" key={key}>
                 <span>
-                  {TOPICS[subject][key.split(":")[1]] || key.split(":")[1]}
+                  {TOPICS[key.split(":")[0] as Subject][key.split(":")[1]] || key.split(":")[1]}
                 </span>
                 <strong>
                   {Math.round((r.score / r.total) * 100)}%{" "}
@@ -253,7 +285,7 @@ export default function Dashboard() {
         </div>
         {profile?.linkedParents?.map((id) => (
           <div className="focus-row" key={id}>
-            <span>Linked parent …{id.slice(-6)}</span>
+            <span>{parentNames[id] || "Linked parent"}</span>
             <button
               className="secondary"
               disabled={busy}

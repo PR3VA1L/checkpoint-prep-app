@@ -17,6 +17,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .status(409)
         .json({ error: "Complete your account setup first." });
     const { action, code, studentId, parentId, role } = req.body || {};
+    if (action === "links") {
+      const ids: string[] = profile.role === "student"
+        ? (profile.linkedParents || [])
+        : profile.role === "parent" ? (profile.linkedStudents || []) : [];
+      const links = await Promise.all(ids.slice(0, 20).map(async (id) => {
+        if (typeof id !== "string" || id.includes("/")) return null;
+        const sid = profile.role === "student" ? uid : id;
+        const pid = profile.role === "student" ? id : uid;
+        const relationship = await db.doc(`relationships/${sid}_${pid}`).get();
+        if (!relationship.exists) return null;
+        const linked = await db.doc(`users/${id}`).get();
+        return { id, name: linked.data()?.displayName || (profile.role === "student" ? "Parent" : "Student") };
+      }));
+      return res.json({ links: links.filter(Boolean) });
+    }
     if (action === "role") {
       if (role !== "student" && role !== "parent")
         throw new Error("Invalid role");

@@ -346,7 +346,7 @@ export const MATH_FAMILIES: Family[] = [
         `(${y - dy}, ${x + dx})`,
       ],
       explanation: `The movement is ${dx} right and ${dy} down. Add ${dx} to x and subtract ${dy} from y. The point is ${answer}.`,
-      diagram: { kind: "grid", points: [[x, y, "A"]] },
+      diagram: { kind: "grid", points: [{ x, y, label: "A" }] },
     };
   }),
   make("mean", "statistics", "6Ss.03", (v, d) => {

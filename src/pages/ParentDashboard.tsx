@@ -140,6 +140,10 @@ export default function ParentDashboard() {
               <>
                 <div className="stats-grid">
                   <div className="stat">
+                    <strong>{Math.floor(recent.reduce((sum, a) => sum + (a.durationSeconds || 0), 0) / 60)}m</strong>
+                    <span>Active question time</span>
+                  </div>
+                  <div className="stat">
                     <strong>{stats.questions}</strong>
                     <span>MCQs answered</span>
                   </div>
