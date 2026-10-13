@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "test": "node --import tsx --test tests/*.test.ts",
+    "content:export": "node --import tsx scripts/export-authored-bank.ts",
+    "marking:evaluate": "node --import tsx scripts/evaluate-marker.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src api tests",
     "preview": "vite preview"
   },
   "dependencies": {

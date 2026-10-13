@@ -1,124 +1,119 @@
-import { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { BookOpen, PenTool, Home, Award, LogOut, Moon, Sun, History } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import FloatingCalculator from './FloatingCalculator';
-
+import { useState, useEffect } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
+import {
+  BookOpen,
+  LayoutDashboard,
+  ListChecks,
+  History,
+  Menu,
+  Moon,
+  Sun,
+  LogOut,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
 export default function Layout() {
-  const location = useLocation();
-  const { user, logout } = useAuth();
-  
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
-
+  const { profile, user, logout } = useAuth(),
+    location = useLocation();
+  const [openPath, setOpenPath] = useState<string|null>(null),
+    [theme, setTheme] = useState(
+      () => {try{return localStorage.getItem("theme") || "light";}catch{return "light";}},
+    );
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    document.documentElement.dataset.theme = theme;
+    try{localStorage.setItem("theme", theme);}catch{/* Theme still applies if storage is blocked. */}
   }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  const currentSubject = location.pathname.split('/')[3] || 'english';
-
-  const navItems = [
-    { path: '/', label: 'Dashboard', icon: Home },
-    { path: `/practice/mcq/${currentSubject}`, match: '/practice/mcq', label: 'MCQ Practice', icon: BookOpen },
-    { path: `/practice/structured/${currentSubject}`, match: '/practice/structured', label: 'Structured Practice', icon: PenTool },
-    { path: '/history', label: 'History', icon: History },
-    { path: '/contact', label: 'Contact Us', icon: PenTool },
-  ];
-
+  const open=openPath===location.pathname;
+  const parent = profile?.role === "parent";
+  const subject =
+    location.pathname.match(/\/(english|math|science)(?:\/|$)/)?.[1] ||
+    "english";
   return (
-    <div className="app-container">
-      {/* Sidebar */}
-      <aside style={{ width: '250px', padding: '2rem 1rem', display: 'flex', flexDirection: 'column' }} className="glass">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '3rem', padding: '0 1rem' }}>
-          <div style={{ background: 'var(--primary)', color: 'white', padding: '0.5rem', borderRadius: '0.75rem' }}>
-            <Award size={24} />
+    <div className="app-shell">
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
+      <header className="mobile-header">
+        <span>Checkpoint Prep</span>
+        <button
+          aria-label="Toggle navigation"
+          aria-expanded={open}
+          onClick={() => setOpenPath(open?null:location.pathname)}
+        >
+          <Menu size={20} />
+        </button>
+      </header>
+      <aside className={`sidebar ${open ? "is-open" : ""}`}>
+        <NavLink className="brand" to={parent ? "/parent/dashboard" : "/"}>
+          <div className="brand-icon">
+            <BookOpen size={23} />
           </div>
-          <h2 style={{ fontSize: '1.25rem', margin: 0 }} className="text-gradient">Checkpoint Prep</h2>
+          <span>
+            Checkpoint
+            <br />
+            <small>PREP</small>
+          </span>
+        </NavLink>
+        <div className="eyebrow">
+          {parent ? "FAMILY SPACE" : "LEARNING SPACE"}
         </div>
-
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.match && location.pathname.startsWith(item.match));
-            const Icon = item.icon;
-            
-            return (
-              <Link 
-                key={item.path}
-                to={item.path}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  padding: '1rem',
-                  borderRadius: '1rem',
-                  textDecoration: 'none',
-                  color: isActive ? 'white' : 'var(--text-muted)',
-                  background: isActive ? 'var(--primary)' : 'transparent',
-                  fontWeight: isActive ? '600' : '500',
-                  transition: 'all 0.2s',
-                  boxShadow: isActive ? '0 4px 14px 0 rgba(99, 102, 241, 0.39)' : 'none'
-                }}
-              >
-                <Icon size={20} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div style={{ marginTop: 'auto', padding: '1rem' }}>
-          {user && (
-            <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Signed in as</p>
-              <p style={{ fontSize: '0.875rem', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.displayName || user.email || 'Student'}
-              </p>
-            </div>
+        <nav aria-label="Main navigation" onClick={()=>setOpenPath(null)}>
+          {parent ? (
+            <NavLink to="/parent/dashboard">
+              <LayoutDashboard size={19} />
+              Parent dashboard
+            </NavLink>
+          ) : (
+            <>
+              <NavLink to="/" end>
+                <LayoutDashboard size={19} />
+                Overview
+              </NavLink>
+              <NavLink to={`/practice/mcq/${subject}`}>
+                <BookOpen size={19} />
+                Quick practice
+              </NavLink>
+              <NavLink to={`/practice/structured/${subject}`}>
+                <ListChecks size={19} />
+                Structured questions
+              </NavLink>
+              <NavLink to="/history">
+                <History size={19} />
+                My activity
+              </NavLink>
+              <NavLink to="/contact">Report a problem</NavLink>
+            </>
           )}
-          
-          <button 
-            onClick={toggleTheme}
-            style={{
-              width: '100%', padding: '0.75rem', borderRadius: '0.75rem',
-              border: '1px solid var(--border)', background: 'var(--surface)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '0.5rem', color: 'var(--text-main)', fontWeight: '500', fontSize: '0.875rem',
-              transition: 'all 0.2s', marginBottom: '1rem'
-            }}
+        </nav>
+        <div className="sidebar-bottom">
+          <div className="account-label">
+            <strong>
+              {profile?.displayName || user?.displayName || "Your account"}
+            </strong>
+            <small>{user?.email}</small>
+            <span className="badge">
+              {parent ? "Parent" : "Student"} account
+            </span>
+          </div>
+          <button
+            className="secondary"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
-            {theme === 'light' ? <><Moon size={16} /> Dark Mode</> : <><Sun size={16} /> Light Mode</>}
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}{" "}
+            {theme === "dark" ? "Light" : "Dark"} mode
           </button>
-
-          <button 
-            onClick={logout}
-            style={{
-              width: '100%', padding: '0.75rem', borderRadius: '0.75rem',
-              border: '1px solid var(--border)', background: 'rgba(255,255,255,0.5)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '0.5rem', color: 'var(--text-muted)', fontWeight: '500', fontSize: '0.875rem',
-              transition: 'all 0.2s'
-            }}
-          >
-            <LogOut size={16} /> Sign Out
+          <button className="secondary" onClick={() => void logout()}>
+            <LogOut size={17} />
+            Sign out
           </button>
         </div>
       </aside>
-
-      {/* Main Content Area */}
-      <main className="main-content">
-        <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
-          <Outlet />
-        </div>
+      <main id="main" className="main-content">
+        <Outlet />
+        <footer>
+          Original practice, not an official Cambridge assessment. Progress
+          reflects practice, not a certified grade.
+        </footer>
       </main>
-
-      {/* Conditionally render calculator for math and science */}
-      {(location.pathname.includes('/math') || location.pathname.includes('/science')) && (
-        <FloatingCalculator />
-      )}
     </div>
   );
 }

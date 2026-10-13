@@ -1,88 +1,150 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import Layout from './components/Layout';
-import ParentLayout from './components/ParentLayout';
-import ParentDashboard from './pages/ParentDashboard';
-import Dashboard from './pages/Dashboard';
-import MCQPractice from './pages/MCQPractice';
-import StructuredPractice from './pages/StructuredPractice';
-import ExamSimulator from './pages/ExamSimulator';
-import Auth from './pages/Auth';
-import History from './pages/History';
-import ContactUs from './pages/ContactUs';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-
-const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode, allowedRole?: 'student' | 'parent' }) => {
-  const { user, profile, loading } = useAuth();
-  if (loading) return null; // Or a loading spinner
-  if (!user) return <Navigate to="/auth" />;
-  
-  if (allowedRole && profile) {
-    if (allowedRole === 'student' && profile.role === 'parent') {
-      return <Navigate to="/parent/dashboard" replace />;
-    }
-    if (allowedRole === 'parent' && profile.role === 'student') {
-      return <Navigate to="/" replace />;
-    }
+import { Component, lazy, Suspense } from "react";
+import type { ReactNode } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import Layout from "./components/Layout";
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Practice = lazy(() => import("./pages/Practice"));
+const Parent = lazy(() => import("./pages/ParentDashboard"));
+const History = lazy(() => import("./pages/History"));
+const Contact = lazy(() => import("./pages/ContactUs"));
+function Protected({
+  children,
+  role,
+}: {
+  children: ReactNode;
+  role: "student" | "parent";
+}) {
+  const { user, profile, loading, error } = useAuth();
+  if (loading)
+    return (
+      <p className="loading" role="status">
+        Loading your account…
+      </p>
+    );
+  if (error)
+    return (
+      <section className="auth-card">
+        <h1>Account unavailable</h1>
+        <p role="alert">{error}</p>
+        <button onClick={() => window.location.reload()}>Try again</button>
+      </section>
+    );
+  if (!user || !profile) return <Navigate to="/auth" replace />;
+  if (profile.role !== role)
+    return (
+      <Navigate
+        to={profile.role === "parent" ? "/parent/dashboard" : "/"}
+        replace
+      />
+    );
+  return children;
+}
+class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
   }
-  
-  return <>{children}</>;
-};
-
-function App() {
+  render() {
+    return this.state.failed ? (
+      <main className="auth-card">
+        <h1>Something went wrong</h1>
+        <p>
+          Your locally saved draft has not been deleted. Reload to resume it.
+        </p>
+        <button onClick={() => window.location.reload()}>Reload</button>
+      </main>
+    ) : (
+      this.props.children
+    );
+  }
+}
+export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={
-              <ProtectedRoute allowedRole="student">
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="history" element={
-              <ProtectedRoute allowedRole="student">
-                <History />
-              </ProtectedRoute>
-            } />
-            <Route path="practice/mcq/:subject" element={
-              <ProtectedRoute allowedRole="student">
-                <MCQPractice />
-              </ProtectedRoute>
-            } />
-            <Route path="practice/structured/:subject" element={
-              <ProtectedRoute allowedRole="student">
-                <StructuredPractice />
-              </ProtectedRoute>
-            } />
-            <Route path="practice/exam/:subject" element={
-              <ProtectedRoute allowedRole="student">
-                <ExamSimulator />
-              </ProtectedRoute>
-            } />
-            <Route path="practice/mcq" element={<Navigate to="english" replace />} />
-            <Route path="practice/structured" element={<Navigate to="english" replace />} />
-            <Route path="practice/exam" element={<Navigate to="english" replace />} />
-            <Route path="contact" element={
-              <ProtectedRoute allowedRole="student">
-                <ContactUs />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          <Route path="/parent" element={<ParentLayout />}>
-            <Route path="dashboard" element={
-              <ProtectedRoute allowedRole="parent">
-                <ParentDashboard />
-              </ProtectedRoute>
-            } />
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <Boundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <Suspense
+            fallback={
+              <p className="loading" role="status">
+                Loading…
+              </p>
+            }
+          >
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route element={<Layout />}>
+                <Route
+                  path="/"
+                  element={
+                    <Protected role="student">
+                      <Dashboard />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/practice/mcq/:subject"
+                  element={
+                    <Protected role="student">
+                      <Practice />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/practice/structured/:subject"
+                  element={
+                    <Protected role="student">
+                      <Practice mode="structured" />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/practice/written/:subject"
+                  element={
+                    <Protected role="student">
+                      <Practice mode="structured" />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/practice/exam/:subject"
+                  element={
+                    <Protected role="student">
+                      <Practice mode="structured" />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/history"
+                  element={
+                    <Protected role="student">
+                      <History />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/contact"
+                  element={
+                    <Protected role="student">
+                      <Contact />
+                    </Protected>
+                  }
+                />
+                <Route
+                  path="/parent/dashboard"
+                  element={
+                    <Protected role="parent">
+                      <Parent />
+                    </Protected>
+                  }
+                />
+              </Route>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </AuthProvider>
+    </Boundary>
   );
 }
-
-export default App;

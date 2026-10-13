@@ -1,337 +1,297 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { PlayCircle, Target, Trophy, Star, BrainCircuit, Loader2, Sparkles, RefreshCw } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { collection, query, where, getDocs, Timestamp, doc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import type { UserProgress } from '../lib/srs';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { collection, onSnapshot } from "firebase/firestore";
+import { ArrowUpRight, BookOpen, ListChecks, Target } from "lucide-react";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
+import { useAttempts } from "../learning/useAttempts";
+import { useClock } from "../learning/useClock";
+import { summarise } from "../learning/engine";
+import { TOPICS, subjectName } from "../learning/curriculum";
+import { dayKey, futureDay } from "../learning/random";
+import type { Subject, Review } from "../learning/types";
+import Activity from "../components/Activity";
+import { accountAction } from "../lib/account";
 export default function Dashboard() {
-  const { user, profile, refreshProfile } = useAuth();
-  const [generatingCode, setGeneratingCode] = useState(false);
-  
-  const [stats, setStats] = useState({
-    reviewed: 0,
-    mastered: 0,
-    due: 0
-  });
-  const [chartData, setChartData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedSubject, setSelectedSubject] = useState('english');
-
+  const { user, profile } = useAuth(),
+    { data, loading, error } = useAttempts(user?.uid);
+  const [subject, setSubject] = useState<Subject>("english"),
+    [reviews, setReviews] = useState<Review[]>([]),
+    [message, setMessage] = useState(""),
+    [busy, setBusy] = useState(false);
+  const now = useClock();
+  const zone =
+      profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    today = dayKey(new Date(now), zone);
   useEffect(() => {
-    const fetchProgress = async () => {
-      if (!user) return;
-      try {
-        const q = query(collection(db, 'user_progress'), where('userId', '==', user.uid));
-        const snapshot = await getDocs(q);
-        
-        let reviewedCount = 0;
-        let masteredCount = 0;
-        let dueCount = 0;
-        const now = Timestamp.now();
-
-        snapshot.forEach((doc) => {
-          const data = doc.data() as UserProgress;
-          reviewedCount++;
-          if (data.consecutiveCorrect >= 3) {
-            masteredCount++;
-          }
-          if (data.nextReviewDate && data.nextReviewDate.toMillis() <= now.toMillis()) {
-            dueCount++;
-          }
-        });
-        
-        // Real chart data from sessions
-        const sessionsRef = collection(db, 'users', user.uid, 'sessions');
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        const sessionsQuery = query(sessionsRef, where('timestamp', '>=', Timestamp.fromDate(weekAgo)));
-        const sessionsSnap = await getDocs(sessionsQuery);
-        
-        const dayScores: Record<string, { score: number, total: number }> = {};
-        const date = new Date();
-        date.setDate(date.getDate() - 6);
-        for(let i=0; i<7; i++) {
-          const name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
-          dayScores[name] = { score: 0, total: 0 };
-          date.setDate(date.getDate() + 1);
-        }
-
-        sessionsSnap.forEach(doc => {
-          const data = doc.data();
-          if (data.timestamp) {
-            const d = data.timestamp.toDate();
-            const name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
-            if (dayScores[name] && typeof data.score === 'number' && typeof data.total === 'number') {
-              dayScores[name].score += data.score;
-              dayScores[name].total += data.total;
-            }
-          }
-        });
-
-        const realChartData = Object.keys(dayScores).map(name => {
-          const s = dayScores[name];
-          return {
-            name,
-            score: s.total > 0 ? Math.round((s.score / s.total) * 100) : null
-          };
-        });
-        setChartData(realChartData);
-
-        setStats({
-          reviewed: reviewedCount,
-          mastered: masteredCount,
-          due: dueCount
-        });
-      } catch (error) {
-        console.error("Failed to fetch user progress:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProgress();
-  }, [user]);
-
-  const generateLinkCode = async () => {
     if (!user) return;
-    setGeneratingCode(true);
+    return onSnapshot(
+      collection(db, "users", user.uid, "reviews"),
+      (s) => setReviews(s.docs.map((d) => d.data() as Review)),
+      () => setMessage("Review schedule could not be loaded."),
+    );
+  }, [user]);
+  const filtered = data.filter((a) => a.subject === subject),
+    stats = summarise(filtered),
+    due = reviews.filter(
+      (r) => r.due <= today && r.lastDay !== today && r.correct === 0,
+    ).length;
+  const days = Array.from({ length: 7 }, (_, i) => futureDay(today, i - 6));
+  const chart = days.map((day) => {
+    const a = filtered.filter(
+      (a) =>
+        a.completedAt &&
+        dayKey(new Date(a.completedAt), zone) === day &&
+        a.status === "completed" &&
+        a.grading !== "awaiting-review",
+    );
+    const score = a.reduce((n, s) => n + s.score, 0),
+      total = a.reduce((n, s) => n + s.total, 0);
+    return { day, score: total ? Math.round((score / total) * 100) : null };
+  });
+  async function action(body: Record<string, string>) {
+    setBusy(true);
+    setMessage("");
     try {
-      const newCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-      // Store the link code in a dedicated collection
-      await setDoc(doc(db, 'link_codes', newCode), {
-        studentId: user.uid,
-        expiresAt: Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)) // 24 hours
-      });
-      // Also store it on the user profile for UI display if needed
-      await setDoc(doc(db, 'users', user.uid), {
-        linkingCode: newCode
-      }, { merge: true });
-      await refreshProfile();
-    } catch (e: any) {
-      console.error(e);
-      alert("Failed to generate code. Error: " + e.message);
+      const r = await accountAction(body);
+      if (r.code)
+        setMessage(
+          `Invitation ${r.code} is valid for 24 hours and one use. Only share it with the parent you want to grant access.`,
+        );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Request failed");
     } finally {
-      setGeneratingCode(false);
+      setBusy(false);
     }
-  };
-
+  }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem', paddingBottom: '4rem' }}>
-      <header>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>
-          Welcome back, <span className="text-gradient">{user?.displayName?.split(' ')[0] || 'Student'}!</span> 👋
-        </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.125rem' }}>
-          {stats.due > 0 
-            ? `You have ${stats.due} questions waiting for your daily review.`
-            : "You're all caught up for today! Keep up the momentum."}
-        </p>
-      </header>
-
-      {/* SRS Mastery Stats Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
-        
-        <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{ background: 'rgba(59, 130, 246, 0.15)', color: 'var(--primary)', padding: '1rem', borderRadius: '1rem' }}>
-            {loading ? <Loader2 className="animate-spin" /> : <BrainCircuit size={32} />}
-          </div>
-          <div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{loading ? '-' : stats.reviewed}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Questions Practiced</p>
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', padding: '1rem', borderRadius: '1rem' }}>
-            {loading ? <Loader2 className="animate-spin" /> : <Trophy size={32} />}
-          </div>
-          <div style={{ flex: 1 }}>
-            {(() => {
-              const m = stats.mastered;
-              let level = 1;
-              let title = "Beginner";
-              let max = 5;
-              if (m >= 100) { level = 5; title = "Master"; max = m; }
-              else if (m >= 50) { level = 4; title = "Expert"; max = 100; }
-              else if (m >= 20) { level = 3; title = "Proficient"; max = 50; }
-              else if (m >= 5) { level = 2; title = "Learner"; max = 20; }
-
-              const progress = level === 5 ? 100 : (m / max) * 100;
-              
-              return (
-                <div style={{ width: '100%' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '0.25rem' }}>
-                    <p style={{ fontSize: '1.25rem', fontWeight: 'bold', lineHeight: 1 }}>
-                      Level {level}: <span style={{ color: 'var(--success)' }}>{title}</span>
-                    </p>
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <span key={star} style={{ color: star <= level ? '#eab308' : 'rgba(0,0,0,0.1)', fontSize: '1.1rem' }}>★</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ width: '100%', height: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '1rem', overflow: 'hidden' }}>
-                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--success)', borderRadius: '1rem', transition: 'width 0.5s' }} />
-                  </div>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
-                    {m} / {level === 5 ? '∞' : max} concepts mastered
-                  </p>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', border: stats.due > 0 ? '2px solid var(--accent)' : 'none' }}>
-          <div style={{ background: 'rgba(245, 158, 11, 0.15)', color: 'var(--accent)', padding: '1rem', borderRadius: '1rem' }}>
-            {loading ? <Loader2 className="animate-spin" /> : <Target size={32} />}
-          </div>
-          <div>
-            <p style={{ fontSize: '2rem', fontWeight: 'bold', lineHeight: 1 }}>{loading ? '-' : stats.due}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>Due for Review</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card" style={{ padding: '1.5rem', marginBottom: '1rem' }}>
-        <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <Target size={18} color="var(--primary)" /> Parent Linking
-        </h3>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem' }}>
-          Allow your parents to track your progress by giving them this code.
-        </p>
-        {profile?.linkingCode ? (
-          <div style={{ padding: '1rem', background: 'var(--surface)', borderRadius: '0.75rem', border: '1px dashed var(--border)', textAlign: 'center', fontSize: '1.25rem', fontWeight: 'bold', letterSpacing: '2px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem' }}>
-            <span>{profile.linkingCode}</span>
-            <button onClick={generateLinkCode} disabled={generatingCode} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)' }} title="Generate new code">
-              <RefreshCw size={18} className={generatingCode ? 'animate-spin' : ''} />
-            </button>
-          </div>
-        ) : (
-          <button 
-            onClick={generateLinkCode}
-            disabled={generatingCode}
-            className="btn"
-            style={{ width: '100%', background: 'var(--primary-light)', color: 'var(--primary)', padding: '0.75rem' }}
-          >
-            {generatingCode ? 'Generating...' : 'Generate Code'}
-          </button>
-        )}
-      </div>
-
-      {/* Subject Selector */}
-      <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '1rem' }}>
-        {['english', 'math', 'science'].map(subject => (
-          <button
-            key={subject}
-            onClick={() => setSelectedSubject(subject)}
-            style={{
-              padding: '1rem 2rem',
-              borderRadius: '1rem',
-              border: 'none',
-              background: selectedSubject === subject ? 'var(--primary)' : 'var(--surface)',
-              color: selectedSubject === subject ? 'white' : 'var(--text-main)',
-              fontWeight: 'bold',
-              fontSize: '1.1rem',
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-              boxShadow: selectedSubject === subject ? '0 4px 6px -1px rgba(99, 102, 241, 0.4)' : 'none',
-              transition: 'all 0.2s'
-            }}
-          >
-            {subject}
-          </button>
-        ))}
-      </div>
-
-      {/* Adaptive Daily Study Plan Banner */}
-      <div className="glass-card" style={{ padding: '2.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%)', border: '2px solid var(--primary)' }}>
+    <div className="page-stack">
+      <header className="dashboard-heading">
         <div>
-          <h2 style={{ fontSize: '1.8rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <Sparkles color="var(--primary)" /> Your Daily Adaptive Plan
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', maxWidth: '600px' }}>
-            We've built a custom 15-question practice session targeting exactly what you need to review today across {selectedSubject}.
+          <div className="eyebrow">A LITTLE PRACTICE. A LOT OF PROGRESS.</div>
+          <h1>
+            Hello,{" "}
+            {profile?.displayName ||
+              user?.displayName?.split(" ")[0] ||
+              "learner"}
+            .
+          </h1>
+          <p className="muted">
+            {loading
+              ? "Loading your activity…"
+              : due
+                ? `${due} ${due === 1 ? "skill is" : "skills are"} ready for a fresh review variation.`
+                : "Choose a subject and take your next step."}
           </p>
         </div>
-        <Link to={`/practice/mcq/${selectedSubject}?plan=daily`} className="btn btn-primary" style={{ padding: '1rem 2rem', fontSize: '1.1rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <PlayCircle /> Start Daily Plan
-        </Link>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1.5rem', marginTop: '1rem' }}>
-        <div className="glass-card" style={{ padding: '2rem' }}>
-          <h3 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Performance Trend (Last 7 Days)</h3>
-          <div style={{ height: '300px', width: '100%' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="name" stroke="var(--text-muted)" />
-                <YAxis stroke="var(--text-muted)" domain={[0, 100]} />
-                <Tooltip contentStyle={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.5rem' }} />
-                <Area type="monotone" dataKey="score" stroke="var(--primary)" strokeWidth={3} fillOpacity={1} fill="url(#colorScore)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <span className="badge live">Live account activity</span>
+      </header>
+      {(error || message) && (
+        <p className="notice" role="status">
+          {error || message}
+        </p>
+      )}
+      <nav className="subject-tabs" aria-label="Dashboard subject">
+        {(["english", "math", "science"] as const).map((s) => (
+          <button
+            aria-pressed={subject === s}
+            key={s}
+            onClick={() => setSubject(s)}
+          >
+            {subjectName(s)}
+          </button>
+        ))}
+      </nav>
+      <section className="hero-panel">
+        <div>
+          <div className="eyebrow">TODAY’S NEXT STEP</div>
+          <h2>
+            Make room for
+            <br />a new discovery.
+          </h2>
+          <p>
+            Try a fresh {subjectName(subject)} question. Mistakes become a later
+            review—not today’s repetition.
+          </p>
+          <Link className="button" to={`/practice/mcq/${subject}`}>
+            Start quick practice <ArrowUpRight size={19} />
+          </Link>
         </div>
-      </div>
-
-      {/* Quick Start Actions */}
-      <div>
-        <h2 style={{ fontSize: '1.75rem', marginBottom: '1.5rem', textTransform: 'capitalize' }}>{selectedSubject} Practice</h2>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
-          
-          <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div className="animate-float" style={{ background: 'var(--primary-light)', color: 'var(--primary)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1rem' }}>
-              <PlayCircle size={48} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Multiple Choice</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Unlimited focused practice customized to your level.
-            </p>
-            <Link to={`/practice/mcq/${selectedSubject}`} className="btn btn-primary" style={{ width: '100%', textDecoration: 'none' }}>
-              Start Practice
-            </Link>
+        <div className="hero-art" aria-hidden="true">
+          <div className="art-sheet">
+            <span>THINK IT THROUGH</span>
+            <div>?</div>
+            <i>Notice. Reason. Explain.</i>
           </div>
-
-          <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-            <div className="animate-float" style={{ background: 'rgba(16, 185, 129, 0.1)', color: 'var(--secondary)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1rem', animationDelay: '1s' }}>
-              <Star size={48} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Structured Practice & OCR</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Solve problems or upload working, graded instantly by AI.
-            </p>
-            <Link to={`/practice/structured/${selectedSubject}`} className="btn btn-secondary" style={{ width: '100%', textDecoration: 'none' }}>
-              {selectedSubject === 'english' ? 'Start Writing' : 'Start Paper'}
-            </Link>
-          </div>
-
-          <div className="glass-card" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', border: '2px solid var(--accent)' }}>
-            <div className="animate-float" style={{ background: 'rgba(245, 158, 11, 0.1)', color: 'var(--accent)', padding: '1.5rem', borderRadius: '50%', marginBottom: '1rem', animationDelay: '2s' }}>
-              <Sparkles size={48} />
-            </div>
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Full Exam Simulator</h3>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-              Full Paper 1 and Paper 2 mock exams timed under test conditions.
-            </p>
-            <Link to={`/practice/exam/${selectedSubject}`} className="btn" style={{ background: 'var(--accent)', color: 'white', width: '100%', textDecoration: 'none' }}>
-              Start Exam
-            </Link>
-          </div>
-
+          <div className="art-orbit" />
         </div>
+      </section>
+      <section className="stats-grid" aria-label="Recent activity">
+        <div className="stat">
+          <BookOpen />
+          <strong>{loading ? "—" : stats.questions}</strong>
+          <span>MCQs answered</span>
+        </div>
+        <div className="stat">
+          <ListChecks />
+          <strong>{loading ? "—" : stats.structured}</strong>
+          <span>Structured / writing {stats.structured === 1 ? "session" : "sessions"}</span>
+        </div>
+        <div className="stat">
+          <Target />
+          <strong>
+            {loading
+              ? "—"
+              : stats.total
+                ? `${Math.round((stats.score / stats.total) * 100)}%`
+                : "—"}
+          </strong>
+          <span>Marked practice accuracy</span>
+        </div>
+        <div className="stat">
+          <strong>{loading ? "—" : stats.pending}</strong>
+          <span>Sessions awaiting review</span>
+        </div>
+      </section>
+      <div className="two-columns">
+        <section className="panel">
+          <div className="section-title">
+            <h2>Practice with a purpose</h2>
+            <span className="badge">{subjectName(subject)}</span>
+          </div>
+          <p>
+            Choose Paper 1 or Paper 2, your topics and your level. Show your
+            working and compare it with clear marking guidance.
+          </p>
+          <Link
+            className="button secondary"
+            to={`/practice/structured/${subject}`}
+          >
+            Build structured practice →
+          </Link>
+          <h3 className="spaced">Your next focus</h3>
+          {Object.entries(stats.topics)
+            .filter(([, r]) => r.count >= 3)
+            .sort((a, b) => a[1].score / a[1].total - b[1].score / b[1].total)
+            .slice(0, 3)
+            .map(([key, r]) => (
+              <div className="focus-row" key={key}>
+                <span>
+                  {TOPICS[subject][key.split(":")[1]] || key.split(":")[1]}
+                </span>
+                <strong>
+                  {Math.round((r.score / r.total) * 100)}%{" "}
+                  <small>({r.count} responses)</small>
+                </strong>
+              </div>
+            ))}
+          {!Object.values(stats.topics).some((r) => r.count >= 3) && (
+            <p className="muted">
+              Complete a few questions before we suggest a focus. No scores are
+              invented.
+            </p>
+          )}
+        </section>
+        <section className="panel">
+          <h2>Last seven days</h2>
+          <p className="muted">
+            Marked practice only · gaps mean no marked work
+          </p>
+          <div
+            className="trend"
+            role="img"
+            aria-label={chart
+              .map(
+                (d) =>
+                  `${d.day}: ${d.score === null ? "no marked work" : d.score + " percent"}`,
+              )
+              .join("; ")}
+          >
+            {chart.map((d) => (
+              <div className="trend-column" key={d.day}>
+                <span>{d.score === null ? "—" : `${d.score}%`}</span>
+                <div
+                  style={{
+                    height: `${d.score === null ? 3 : Math.max(3, d.score)}%`,
+                  }}
+                />
+                <small>
+                  {new Date(d.day + "T12:00:00").toLocaleDateString(undefined, {
+                    weekday: "short",
+                  })}
+                </small>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
+      <section className="panel">
+        <div className="section-title">
+          <h2>Recent activity</h2>
+          <Link to="/history">See all →</Link>
+        </div>
+        <Activity attempts={filtered.slice(0, 5)} />
+        <p className="helper">
+          Summaries use the latest 200 saved sessions. Self-assessed scores are
+          practice estimates.
+        </p>
+      </section>
+      <section className="panel">
+        <h2>Family access</h2>
+        <p>
+          Generate a one-use invitation for your parent. Sharing it grants
+          access to your saved practice; you can remove access below.
+        </p>
+        <div className="button-row">
+          <button
+            disabled={busy}
+            onClick={() => void action({ action: "invite" })}
+          >
+            Create parent invitation
+          </button>
+          {profile?.linkingCode && <code>{profile.linkingCode}</code>}
+        </div>
+        {profile?.linkedParents?.map((id) => (
+          <div className="focus-row" key={id}>
+            <span>Linked parent …{id.slice(-6)}</span>
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    "Remove this parent’s access to your practice?",
+                  )
+                )
+                  void action({ action: "unlink", parentId: id });
+              }}
+            >
+              Remove access
+            </button>
+          </div>
+        ))}
+        <details>
+          <summary>My account has the wrong role</summary>
+          <p>
+            Signed in as {user?.email}. Changing the role does not delete
+            practice history or grant access to another student.
+          </p>
+          <button
+            className="secondary"
+            disabled={busy}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Use this account as a parent? Your practice history will be kept.",
+                )
+              )
+                void action({ action: "role", role: "parent" });
+            }}
+          >
+            Use this account as a parent
+          </button>
+        </details>
+      </section>
     </div>
   );
 }

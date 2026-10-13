@@ -1,58 +1,50 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // 1. Questions Collection
-    match /questions/{questionId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if false;
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function parentOf(uid) {
+      return request.auth != null && (
+        exists(/databases/$(database)/documents/relationships/$(uid + '_' + request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('linkedStudents', []))
+      );
     }
-
-    // 2. User Progress Collection (Spaced Repetition Data)
-    match /user_progress/{progressId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null 
-                    && resource.data.userId == request.auth.uid 
-                    && request.resource.data.userId == request.auth.uid;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
-    }
-
-    // 3. Link Codes Collection for secure parent-student linking
-    match /link_codes/{code} {
-      // Anyone can read a link code to get the studentId, if they know the code
-      allow read: if request.auth != null;
-      // Only the student can create their own link code
-      allow create: if request.auth != null && request.resource.data.studentId == request.auth.uid;
-      // Only the student can delete their own link code
-      allow delete: if request.auth != null && resource.data.studentId == request.auth.uid;
-      allow update: if false;
-    }
-
-    // 4. Users Collection (Profiles, linking, roles)
-    match /users/{userId} {
-      // Users can read/write their own profile
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      // Parents can read a student's profile if the student is in their linkedStudents array
-      allow read: if request.auth != null && 
-                  (userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudents);
-      
-      // 5. Sessions Subcollection (Practice history)
-      match /sessions/{sessionId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        // Linked parents can read sessions
-        allow read: if request.auth != null && 
-                    (userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudents);
+    function validProfile() { return request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100 && request.resource.data.timezone is string && request.resource.data.timezone.size() <= 100; }
+    match /users/{uid} {
+      allow get: if owner(uid) || parentOf(uid);
+      allow list: if false;
+      allow create: if owner(uid) && request.resource.data.keys().hasOnly(['role','displayName','timezone']) && request.resource.data.role in ['student','parent'] && validProfile();
+      allow update: if owner(uid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName','timezone']) && validProfile();
+      allow delete: if false;
+      match /sessions/{id} {
+        allow read: if owner(uid) || parentOf(uid);
+        allow create, update: if owner(uid) && request.resource.data.schemaVersion == 2 && request.resource.data.id == id && request.resource.data.subject in ['english','math','science'] && request.resource.data.mode in ['mcq','structured','writing'] && request.resource.data.status in ['active','completed'] && request.resource.data.score is number && request.resource.data.total is number && request.resource.data.score >= 0 && request.resource.data.score <= request.resource.data.total && request.resource.data.total > 0 && request.resource.data.total <= 100 && request.resource.data.questions is list && request.resource.data.questions.size() <= 50;
+        allow delete: if false;
       }
-
-      // 6. Progress Subcollection
-      match /progress/{progressId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-        allow read: if request.auth != null && 
-                    (userId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.linkedStudents);
+      match /seen/{id} {
+        allow read: if owner(uid);
+        allow create: if owner(uid) && request.resource.data.keys().hasOnly(['id','family','day','attemptId']) && request.resource.data.id == id;
+        allow update, delete: if false;
       }
+      match /reviews/{id} {
+        allow read: if owner(uid) || parentOf(uid);
+        allow create, update: if owner(uid) && request.resource.data.keys().hasOnly(['family','due','lastDay','correct','lastAttempt']) && request.resource.data.family == id && request.resource.data.correct is number && request.resource.data.correct >= 0;
+        allow delete: if false;
+      }
+      match /review_events/{id} {
+        allow read: if owner(uid);
+        allow create, update: if owner(uid) && request.resource.data.keys().hasOnly(['attemptId','family','correct','previousCorrect']) && request.resource.data.correct is bool && request.resource.data.previousCorrect is number && request.resource.data.previousCorrect >= 0;
+        allow delete: if false;
+      }
+    }
+    match /questions/{id} { allow read: if request.auth != null; allow write: if false; }
+    match /user_progress/{id} { allow read: if request.auth != null && resource.data.userId == request.auth.uid; allow write: if false; }
+    match /link_codes/{id} { allow read, write: if false; }
+    match /relationships/{id} { allow read, write: if false; }
+    match /rate_limits/{id} { allow read, write: if false; }
+    match /feedback/{id} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid && request.resource.data.message is string && request.resource.data.message.size() > 0 && request.resource.data.message.size() <= 4000;
+      allow read, update, delete: if false;
     }
   }
 }

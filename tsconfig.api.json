@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "module": "ESNext", "moduleResolution": "Bundler",
+    "types": ["node"], "skipLibCheck": true, "noEmit": true,
+    "esModuleInterop": true, "strict": true,
+    "tsBuildInfoFile": "./.cache/tsconfig.api.tsbuildinfo"
+  },
+  "include": ["api"]
+}

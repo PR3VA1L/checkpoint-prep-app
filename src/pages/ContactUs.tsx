@@ -52,17 +52,17 @@ export default function ContactUs() {
           <div style={{ textAlign: 'center', padding: '2rem 0' }}>
             <CheckCircle2 size={64} color="var(--success)" style={{ margin: '0 auto 1rem' }} />
             <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: 'var(--success)' }}>Message Sent!</h2>
-            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Thank you for your feedback. We'll look into it right away.</p>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>Thank you for your feedback. Your report has been saved for review.</p>
             <button className="btn btn-secondary" onClick={() => setSubmitted(false)}>Send Another Message</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Subject</label>
-              <select 
+              <label htmlFor="feedback-subject" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Subject</label>
+              <select id="feedback-subject"
                 value={subject} 
                 onChange={(e) => setSubject(e.target.value)}
-                style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.5)', fontSize: '1rem', fontFamily: 'inherit' }}
+                style={{ width: '100%', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--panel)', fontSize: '1rem', fontFamily: 'inherit' }}
                 required
               >
                 <option value="">Select a topic...</option>
@@ -74,12 +74,12 @@ export default function ContactUs() {
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Message</label>
-              <textarea 
+              <label htmlFor="feedback-message" style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Message</label>
+              <textarea id="feedback-message" maxLength={4000}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 placeholder="Describe your issue or feedback in detail..."
-                style={{ width: '100%', minHeight: '150px', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'rgba(255,255,255,0.5)', fontSize: '1rem', fontFamily: 'inherit', resize: 'vertical' }}
+                style={{ width: '100%', minHeight: '150px', padding: '1rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--panel)', fontSize: '1rem', fontFamily: 'inherit', resize: 'vertical' }}
                 required
               />
             </div>
