@@ -78,6 +78,29 @@ test("every authored variant: four unique options, valid key, exact two-mark str
     "Distinct stems:",
     Object.fromEntries(Object.entries(unique).map(([s, ids]) => [s, ids.size])),
   );
+  for (const subject of ["math", "science", "english"] as const)
+    assert.ok(unique[subject].size >= 500, `${subject} needs 500 distinct MCQ stems`);
+});
+test("structured bank meets the subject minimums", () => {
+  const totals: Record<string, number> = {};
+  for (const subject of ["math", "science"] as const) {
+    const prompts = new Set<string>();
+    for (const f of FAMILIES.filter((item) => item.subject === subject))
+      for (let v = 0; v < f.variants; v++) {
+        const q = f.make(v, "Medium", 1);
+        if (q.parts.length >= 2) prompts.add(fingerprint(q));
+      }
+    assert.ok(prompts.size >= 50, `${subject} needs 50 structured question groups`);
+    totals[subject] = prompts.size;
+  }
+  const readingParts = new Set(
+    READINGS.flatMap((reading) =>
+      readingQuestion(reading, "Medium").parts.map((part) => `${reading.id}:${part.id}`),
+    ),
+  );
+  assert.ok(readingParts.size >= 20, "English needs 20 passage-based structured questions");
+  totals.english = readingParts.size;
+  console.log("Structured question groups/parts:", totals);
 });
 test("at least thirty successive broad-topic sessions contain no repeated question", () => {
   for (const subject of ["math", "science", "english"] as const) {

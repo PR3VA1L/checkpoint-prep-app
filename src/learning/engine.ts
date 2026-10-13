@@ -17,12 +17,16 @@ import {
 import { shuffle, futureDay } from "./random.js";
 import { EXTENSION_FAMILIES } from "./extension.js";
 import { CHALLENGE_FAMILIES } from "./challenge.js";
+import { ENGLISH_EXTRA_FAMILIES } from "./englishExtra.js";
+import { SCIENCE_EXTRA_FAMILIES } from "./scienceExtra.js";
 export const FAMILIES = [
   ...MATH_FAMILIES,
   ...SCIENCE_FAMILIES,
   ...ENGLISH_FAMILIES,
   ...EXTENSION_FAMILIES,
   ...CHALLENGE_FAMILIES,
+  ...ENGLISH_EXTRA_FAMILIES,
+  ...SCIENCE_EXTRA_FAMILIES,
 ];
 export function fingerprint(q: Question) {
   // Changing distractors, answer order or difficulty labels cannot make a seen

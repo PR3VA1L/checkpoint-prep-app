@@ -14,7 +14,7 @@ const names = [
   "Amir",
   "Lena",
 ];
-function family(
+export function family(
   id: string,
   topic: string,
   objective: string,
