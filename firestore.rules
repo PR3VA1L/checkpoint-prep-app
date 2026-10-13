@@ -4,9 +4,7 @@ service cloud.firestore {
     function owner(uid) { return request.auth != null && request.auth.uid == uid; }
     function parentOf(uid) {
       return request.auth != null && (
-        exists(/databases/$(database)/documents/relationships/$(uid + '_' + request.auth.uid)) ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         uid in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('linkedStudents', []))
+        exists(/databases/$(database)/documents/relationships/$(uid + '_' + request.auth.uid))
       );
     }
     function validProfile() { return request.resource.data.displayName is string && request.resource.data.displayName.size() <= 100 && request.resource.data.timezone is string && request.resource.data.timezone.size() <= 100; }
