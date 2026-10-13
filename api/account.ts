@@ -16,7 +16,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res
         .status(409)
         .json({ error: "Complete your account setup first." });
-    const { action, code, studentId, parentId, role } = req.body || {};
+    const { action, code, studentId, parentId, role, name } = req.body || {};
+    if (action === "name") {
+      if (typeof name !== "string" || name.trim().length < 2 || name.trim().length > 80)
+        throw new Error("Enter a name between 2 and 80 characters.");
+      await own.update({ displayName: name.trim() });
+      return res.json({ ok: true });
+    }
     if (action === "links") {
       const ids: string[] = profile.role === "student"
         ? (profile.linkedParents || [])

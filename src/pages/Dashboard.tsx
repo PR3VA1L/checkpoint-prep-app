@@ -70,6 +70,7 @@ export default function Dashboard() {
         setMessage(
           `Invitation ${r.code} is valid for 24 hours and one use. Only share it with the parent you want to grant access.`,
         );
+      else if (body.action === "name") setMessage("Name saved. Linked family will see it after their dashboard refreshes.");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -270,6 +271,11 @@ export default function Dashboard() {
       </section>
       <section className="panel">
         <h2>Family access</h2>
+        <form className="button-row" onSubmit={(event) => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get("displayName") || "").trim(); void action({ action: "name", name }); }}>
+          <label htmlFor="student-display-name">Your name (shown to linked parents)</label>
+          <input id="student-display-name" name="displayName" key={profile?.displayName} defaultValue={profile?.displayName || ""} maxLength={80} minLength={2} required />
+          <button disabled={busy}>Save name</button>
+        </form>
         <p>
           Generate a one-use invitation for your parent. Sharing it grants
           access to your saved practice; you can remove access below.

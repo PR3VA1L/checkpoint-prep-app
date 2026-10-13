@@ -74,6 +74,11 @@ export default function ParentDashboard() {
       )}
       <section className="panel">
         <h2>Connect a student</h2>
+        <form className="button-row" onSubmit={(event) => { event.preventDefault(); const name = String(new FormData(event.currentTarget).get("displayName") || "").trim(); void action({ action: "name", name }); }}>
+          <label htmlFor="parent-display-name">Your name (shown to linked students)</label>
+          <input id="parent-display-name" name="displayName" key={profile?.displayName} defaultValue={profile?.displayName || ""} maxLength={80} minLength={2} required />
+          <button disabled={busy}>Save name</button>
+        </form>
         <p>
           Ask the student to create a new invitation in their dashboard. Older
           six-character codes and unverified legacy links must be replaced.
