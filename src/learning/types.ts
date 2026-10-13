@@ -95,6 +95,7 @@ export interface Attempt {
   grading: "automatic" | "self-assessed" | "ai-assisted" | "awaiting-review";
   status: "active" | "completed";
   durationSeconds: number;
+  activeTimeTracked?: boolean;
   reading?: { id: string; title: string; paragraphs: string[] };
   writingPrompt?: string;
   markingVersion?: string;

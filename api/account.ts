@@ -26,9 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const sid = profile.role === "student" ? uid : id;
         const pid = profile.role === "student" ? id : uid;
         const relationship = await db.doc(`relationships/${sid}_${pid}`).get();
-        if (!relationship.exists) return null;
         const linked = await db.doc(`users/${id}`).get();
-        return { id, name: linked.data()?.displayName || (profile.role === "student" ? "Parent" : "Student") };
+        return { id, name: linked.data()?.displayName || (profile.role === "student" ? "Parent" : "Student"), verified: relationship.exists };
       }));
       return res.json({ links: links.filter(Boolean) });
     }

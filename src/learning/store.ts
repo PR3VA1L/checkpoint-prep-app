@@ -84,6 +84,7 @@ export async function startAttempt(
       grading: config.mode === "mcq" ? "automatic" : "awaiting-review",
       status: "active",
       durationSeconds: 0,
+      activeTimeTracked: true,
       ...(timed
         ? {
             deadline:

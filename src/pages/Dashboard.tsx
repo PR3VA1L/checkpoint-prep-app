@@ -17,7 +17,7 @@ export default function Dashboard() {
   const { user, profile } = useAuth(),
     { data, loading, error } = useAttempts(user?.uid);
   const [subject, setSubject] = useState<Subject | "all">("all"),
-    [parentNames, setParentNames] = useState<Record<string, string>>({}),
+    [parentNames, setParentNames] = useState<Record<string, { name: string; verified: boolean }>>({}),
     [reviews, setReviews] = useState<Review[]>([]),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -37,7 +37,7 @@ export default function Dashboard() {
     if (!profile?.linkedParents?.length) return;
     let live = true;
     void accountAction({ action: "links" }).then((result) => {
-      if (live) setParentNames(Object.fromEntries((result.links || []).map((link: {id: string; name: string}) => [link.id, link.name])));
+      if (live) setParentNames(Object.fromEntries((result.links || []).map((link: {id: string; name: string; verified: boolean}) => [link.id, { name: link.name, verified: link.verified }])));
     }).catch(() => setMessage("Linked parent names could not be loaded."));
     return () => { live = false; };
   }, [profile?.linkedParents]);
@@ -140,7 +140,7 @@ export default function Dashboard() {
       </section>
       <section className="stats-grid" aria-label="Recent activity">
         <div className="stat">
-          <strong>{loading ? "—" : `${Math.floor(filtered.reduce((sum, a) => sum + (a.durationSeconds || 0), 0) / 60)}m`}</strong>
+          <strong>{loading ? "—" : `${Math.floor(filtered.reduce((sum, a) => sum + (a.activeTimeTracked ? a.durationSeconds || 0 : 0), 0) / 60)}m`}</strong>
           <span>Active question time</span>
         </div>
         <div className="stat">
@@ -285,7 +285,7 @@ export default function Dashboard() {
         </div>
         {profile?.linkedParents?.map((id) => (
           <div className="focus-row" key={id}>
-            <span>{parentNames[id] || "Linked parent"}</span>
+            <span>{parentNames[id]?.name || "Parent name unavailable"}{parentNames[id] && !parentNames[id].verified ? " · reconnect with a new invitation to restore access" : ""}</span>
             <button
               className="secondary"
               disabled={busy}

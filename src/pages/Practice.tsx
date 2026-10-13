@@ -79,6 +79,10 @@ function PracticeSubject({
       if (document.hidden || !document.hasFocus()) return;
       const a = current.current;
       if (!a || a.status !== "active") return;
+      if (!a.activeTimeTracked) {
+        a.durationSeconds = 0;
+        a.activeTimeTracked = true;
+      }
       a.durationSeconds = (a.durationSeconds || 0) + 1;
       setActiveSeconds(a.durationSeconds);
       if (a.durationSeconds % 15 === 0) {
@@ -117,7 +121,7 @@ function PracticeSubject({
             else setCloudSaved(true);
             current.current = a;
             setAttempt(a);
-            setActiveSeconds(a.durationSeconds || 0);
+            setActiveSeconds(a.activeTimeTracked ? a.durationSeconds || 0 : 0);
           }
         }
       })
@@ -161,7 +165,7 @@ function PracticeSubject({
             : draft;
         current.current = recovered;
         setAttempt(recovered);
-        setActiveSeconds(recovered.durationSeconds || 0);
+        setActiveSeconds(recovered.activeTimeTracked ? recovered.durationSeconds || 0 : 0);
         setCloudSaved(recovered === cloud);
         setNote(
           recovered.status === "completed"
@@ -332,7 +336,7 @@ function PracticeSubject({
     const result = await requestAutomaticMark(attemptId);
     current.current = result.attempt;
     setAttempt(result.attempt);
-    setActiveSeconds(result.attempt.durationSeconds || 0);
+    setActiveSeconds(result.attempt.activeTimeTracked ? result.attempt.durationSeconds || 0 : 0);
     setCloudSaved(true);
     if (result.pending)
       setNote(
