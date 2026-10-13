@@ -168,7 +168,7 @@ function PracticeSubject({
       setBusy(false);
     }
   }
-  async function sync(a: Attempt, only = a.questions) {
+  async function syncOutcomes(a: Attempt, only = a.questions) {
     if (a.mode === "mcq")
       for (const q of only) {
         const answer = a.answers[q.id];
@@ -201,6 +201,9 @@ function PracticeSubject({
             a.id,
           );
       }
+  }
+  async function sync(a: Attempt, only = a.questions) {
+    await syncOutcomes(a, only);
     await persistAttempt(uid, a);
     setCloudSaved(true);
   }
@@ -301,8 +304,13 @@ function PracticeSubject({
           : "Your paper has been checked against the authored answers. A parent or teacher can review it.",
       );
     if (result.attempt.grading !== "awaiting-review") {
-      const refreshed = update(result.attempt);
-      await sync(refreshed);
+      // The marking endpoint has already committed this paper. Only update the
+      // review schedule; rewriting the whole paper risks a stale-clock conflict.
+      try {
+        await syncOutcomes(result.attempt);
+      } catch {
+        setNote("Your marked paper is saved, but the review schedule could not update. The score is unaffected.");
+      }
     }
   }
   async function retryAutomaticMark() {
