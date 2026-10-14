@@ -151,7 +151,7 @@ test("model marks outside the scheme are rejected, but a cautious valid decision
   const jobs = [{ key: "one", context: "", question: "Q", scheme: "S", expected: "A", answer: "B", max: 2, criteria: [{ id: "m", description: "Method" }, { id: "a", description: "Answer" }] }];
   const marks = acceptModelMarks(jobs, { results: [
     { key: "one", score: 3, confidence: 1, feedback: "Not valid because it exceeds the maximum." },
-    { key: "one", score: 1, confidence: -0.1, feedback: "Confidence cannot be negative." },
+    { key: "one", score: 3, confidence: -0.1, feedback: "The score cannot exceed the maximum." },
     { key: "other", score: 1, confidence: 1, feedback: "Not a real question key." },
   ] });
   assert.deepEqual(marks, {});
@@ -170,6 +170,16 @@ test("model marks outside the scheme are rejected, but a cautious valid decision
   ] });
   assert.equal(valid.one.score, 1);
   assert.equal(valid.one.method, "model");
+});
+
+test("a bounded model total is retained with a light-confidence fallback if detail rows are omitted", () => {
+  const jobs = [{ key: "one", context: "", question: "Q", scheme: "S", expected: "A", answer: "Working shown", max: 2, criteria: [{ id: "m", description: "Method" }, { id: "a", description: "Answer" }] }];
+  const marks = acceptModelMarks(jobs, { results: [
+    { key: "one", score: 1, confidence: 0.96, feedback: "The method is correct but the final answer is missing." },
+  ] });
+  assert.equal(marks.one.score, 1);
+  assert.equal(marks.one.confidence, 0.7);
+  assert.equal(marks.one.criteria?.[0].awarded, true);
 });
 
 test("complete maths and science half-papers can be marked from server-owned schemes", () => {

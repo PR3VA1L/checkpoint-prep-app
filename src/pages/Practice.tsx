@@ -891,6 +891,9 @@ function PracticeSubject({
                         {attempt.answers[key]?.feedback && (
                           <p className="feedback">{attempt.answers[key].feedback}</p>
                         )}
+                        {attempt.answers[key]?.markingUncertain && (
+                          <span className="marking-flag">Check suggested</span>
+                        )}
                         {attempt.answers[key]?.criteria && (
                           <ul className="mark-points" aria-label="Marks earned and points to improve">
                             {attempt.answers[key].criteria.map((point) => (

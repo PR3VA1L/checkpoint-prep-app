@@ -37,6 +37,15 @@
 .mark-points li { margin-block: 0.6rem; }
 .mark-earned > strong { color: var(--success); }
 .mark-missed > strong { color: var(--danger); }
+.marking-flag {
+  display: inline-block;
+  color: #736332;
+  background: #fff9dc;
+  border: 1px solid #eadf9c;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+}
 body {
   margin: 0;
   background: var(--bg);

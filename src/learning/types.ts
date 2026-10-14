@@ -89,6 +89,9 @@ export interface Answer {
   reviewed?: boolean;
   feedback?: string;
   markingMethod?: "rules" | "model" | "manual" | "pending";
+  // The marker still awards a score, but a light UI hint invites a parent or
+  // teacher to glance at a genuinely ambiguous interpretation.
+  markingUncertain?: boolean;
   criteria?: CriterionResult[];
 }
 export interface Attempt {

@@ -215,6 +215,7 @@ export function applyMarks(
         reviewed: result.method !== "pending",
         feedback: result.feedback,
         markingMethod: result.method,
+        markingUncertain: result.method === "model" && result.confidence < 0.8,
         ...(result.criteria ? { criteria: result.criteria } : {}),
       };
       total += result.score;
