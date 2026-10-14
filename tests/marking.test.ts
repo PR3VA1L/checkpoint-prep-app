@@ -147,14 +147,21 @@ test("reading questions are also reconstructed from the authored passage", () =>
   assert.ok(jobs[0].context.includes(reading.paragraphs[0]));
 });
 
-test("model marks outside the scheme or with low confidence are rejected", () => {
+test("model marks outside the scheme are rejected, but a cautious valid decision is retained", () => {
   const jobs = [{ key: "one", context: "", question: "Q", scheme: "S", expected: "A", answer: "B", max: 2, criteria: [{ id: "m", description: "Method" }, { id: "a", description: "Answer" }] }];
   const marks = acceptModelMarks(jobs, { results: [
     { key: "one", score: 3, confidence: 1, feedback: "Not valid because it exceeds the maximum." },
-    { key: "one", score: 1, confidence: 0.5, feedback: "Not sufficiently confident." },
+    { key: "one", score: 1, confidence: -0.1, feedback: "Confidence cannot be negative." },
     { key: "other", score: 1, confidence: 1, feedback: "Not a real question key." },
   ] });
   assert.deepEqual(marks, {});
+  const cautious = acceptModelMarks(jobs, { results: [
+    { key: "one", confidence: 0.5, feedback: "The first point is supported, but the second point is missing.", criteria: [
+      { id: "m", awarded: true, evidence: "B.", feedback: "The method point is shown." },
+      { id: "a", awarded: false, evidence: "", feedback: "The final answer point is missing." },
+    ] },
+  ] });
+  assert.equal(cautious.one.score, 1);
   const valid = acceptModelMarks(jobs, { results: [
     { key: "one", score: 99, confidence: 0.92, feedback: "One method mark is supported by the shown working.", criteria: [
       { id: "m", awarded: true, evidence: "B", feedback: "Valid method." },
