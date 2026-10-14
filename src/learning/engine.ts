@@ -123,7 +123,8 @@ export function selectQuestions(
     (a, b) =>
       config.topics.indexOf(a.f.topic) - config.topics.indexOf(b.f.topic),
   );
-  const passes = config.mode === "mcq" ? 1 : config.count;
+  // Never fill a paper with near-identical variants of one question family.
+  const passes = 1;
   for (let pass = 0; pass < passes && selected.length < config.count; pass++) {
     const ordered = shuffle(pools, random);
     while (ordered.length) {

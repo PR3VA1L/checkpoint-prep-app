@@ -28,7 +28,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (jobs.length && modelConfigured()) {
       try {
         Object.assign(results, await markWithModel(jobs));
-      } catch {
+      } catch (error) {
+        console.warn("Marking provider failed:", error instanceof Error ? error.message : "Unknown provider error");
         modelUnavailable = true;
       }
     }
@@ -40,6 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       tx.update(ref, {
         answers: graded.answers,
         score: graded.score,
+        total: graded.total,
+        questions: graded.questions,
         grading: graded.grading,
         updatedAt: graded.updatedAt,
         markingVersion: graded.markingVersion,

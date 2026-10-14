@@ -8,7 +8,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "POST required" });
   try {
     const { uid } = await authenticate(req);
-    await rateLimit(uid, "account", 30);
+    // Reading linked names must not use up the daily allowance for account changes.
+    await rateLimit(uid, req.body?.action === "links" ? "account-read" : "account", req.body?.action === "links" ? 300 : 30);
     const db = services().db,
       own = db.doc(`users/${uid}`);
     const profile = (await own.get()).data();

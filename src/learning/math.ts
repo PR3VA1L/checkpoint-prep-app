@@ -80,6 +80,10 @@ export function make(
               "Award 2 marks for a correct answer. If the final answer is wrong, award 1 mark for a correct method shown: " +
               q.explanation,
             marks: 2,
+            criteria: [
+              { id: "method", description: "A valid method is shown, allowing an arithmetic slip. Accept an equivalent method. A correct final answer also earns this mark. Method guidance: " + q.explanation },
+              { id: "answer", description: "The final answer is correct, with any units and form required by the question: " + answer },
+            ],
           },
         ],
         ...(q.diagram ? { diagram: q.diagram } : {}),

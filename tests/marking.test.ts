@@ -70,7 +70,7 @@ test("reviewed marking points accept phrases but abstain on negation or missing 
       { alternatives: ["liquid water forms", "turns into liquid water"] },
     ],
   };
-  assert.equal(ruleMark(part, "The water vapour cools and liquid water forms." ).score, 2);
+  assert.equal(ruleMark(part, "The water vapour cools and liquid water forms." ).method, "pending");
   assert.equal(ruleMark(part, "The water vapour does not cool and liquid water forms.").method, "pending");
   assert.equal(ruleMark(part, "The water vapour cools.").method, "pending");
 });
@@ -106,11 +106,11 @@ test("optional Cloudflare marker uses a server-side token and validates marks", 
     assert.equal(String(input), "https://api.cloudflare.com/client/v4/accounts/0123456789abcdef0123456789abcdef/ai/v1/chat/completions");
     assert.equal((init?.headers as Record<string, string> | undefined)?.Authorization, "Bearer private-test-token");
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ results: [
-      { key: "one", score: 1, confidence: 0.9, feedback: "The answer gives the required idea." },
+      { key: "one", confidence: 0.9, feedback: "The answer gives the required idea.", criteria: [{ id: "p1", awarded: true, evidence: "Response", feedback: "Required idea present." }] },
     ] }) } }] }), { status: 200 });
   };
   try {
-    const marks = await markWithCloudflare([{ key: "one", context: "", question: "Why?", scheme: "One idea.", expected: "Idea", answer: "Response", max: 1 }]);
+    const marks = await markWithCloudflare([{ key: "one", context: "", question: "Why?", scheme: "One idea.", expected: "Idea", answer: "Response", max: 1, criteria: [{ id: "p1", description: "Required idea" }] }]);
     assert.equal(marks.one.score, 1);
   } finally {
     globalThis.fetch = prior.fetch;
@@ -148,7 +148,7 @@ test("reading questions are also reconstructed from the authored passage", () =>
 });
 
 test("model marks outside the scheme or with low confidence are rejected", () => {
-  const jobs = [{ key: "one", context: "", question: "Q", scheme: "S", expected: "A", answer: "B", max: 2 }];
+  const jobs = [{ key: "one", context: "", question: "Q", scheme: "S", expected: "A", answer: "B", max: 2, criteria: [{ id: "m", description: "Method" }, { id: "a", description: "Answer" }] }];
   const marks = acceptModelMarks(jobs, { results: [
     { key: "one", score: 3, confidence: 1, feedback: "Not valid because it exceeds the maximum." },
     { key: "one", score: 1, confidence: 0.5, feedback: "Not sufficiently confident." },
@@ -156,7 +156,10 @@ test("model marks outside the scheme or with low confidence are rejected", () =>
   ] });
   assert.deepEqual(marks, {});
   const valid = acceptModelMarks(jobs, { results: [
-    { key: "one", score: 1, confidence: 0.92, feedback: "One method mark is supported by the shown working." },
+    { key: "one", score: 99, confidence: 0.92, feedback: "One method mark is supported by the shown working.", criteria: [
+      { id: "m", awarded: true, evidence: "B", feedback: "Valid method." },
+      { id: "a", awarded: false, evidence: "", feedback: "Answer not correct." },
+    ] },
   ] });
   assert.equal(valid.one.score, 1);
   assert.equal(valid.one.method, "model");
@@ -202,11 +205,14 @@ test("optional private Ollama adapter sends only marking data and validates the 
     assert.equal(body.stream, false);
     assert.equal(body.messages.length, 2);
     return new Response(JSON.stringify({ message: { content: JSON.stringify({
-      results: [{ key: "part", score: 1, confidence: 0.91, feedback: "The answer earns one mark for a supported idea." }],
+      results: [{ key: "part", confidence: 0.91, feedback: "The answer earns one mark for a supported idea.", criteria: [
+        { id: "m", awarded: true, evidence: "Student response", feedback: "Required idea present." },
+        { id: "a", awarded: false, evidence: "", feedback: "Supporting evidence missing." },
+      ] }],
     }) } }), { status: 200 });
   };
   try {
-    const result = await markWithOllama([{ key: "part", context: "A passage", question: "Explain.", scheme: "One mark for a supported idea.", expected: "Idea", answer: "Student response", max: 2 }]);
+    const result = await markWithOllama([{ key: "part", context: "A passage", question: "Explain.", scheme: "One mark for a supported idea.", expected: "Idea", answer: "Student response", max: 2, criteria: [{ id: "m", description: "Idea" }, { id: "a", description: "Evidence" }] }]);
     assert.ok(requested);
     assert.equal(result.part.score, 1);
   } finally {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { useAttempts } from "../learning/useAttempts";
@@ -24,26 +24,15 @@ export default function ParentDashboard() {
   const zone=zones[child]||profile?.timezone||Intl.DateTimeFormat().resolvedOptions().timeZone;
   const start=futureDay(dayKey(new Date(now),zone),1-days);
   const recent = data.filter(
-      (a) => a.completedAt && dayKey(new Date(a.completedAt),zone) >= start,
+      (a) => dayKey(new Date(a.completedAt || a.startedAt),zone) >= start,
     ),
     stats = summarise(recent);
   useEffect(() => {
-    let active = true;
-    void Promise.all(
-      children.map(async (id) => {
-        try {
-          const s = await getDoc(doc(db, "users", id));
-          return {id,name:s.data()?.displayName || `Student …${id.slice(-6)}`,zone:s.data()?.timezone||'UTC'};
-        } catch {
-          return {id,name:`Student …${id.slice(-6)} (relink if unavailable)`,zone:'UTC'};
-        }
-      }),
-    ).then((entries) => {
-      if (active){setNames(Object.fromEntries(entries.map(e=>[e.id,e.name])));setZones(Object.fromEntries(entries.map(e=>[e.id,e.zone])));}
-    });
-    return () => {
-      active = false;
-    };
+    const stops = children.map((id) => onSnapshot(doc(db, "users", id), (snapshot) => {
+      setNames((old) => ({ ...old, [id]: snapshot.data()?.displayName || "Student" }));
+      setZones((old) => ({ ...old, [id]: snapshot.data()?.timezone || "UTC" }));
+    }, () => setNames((old) => ({ ...old, [id]: "Student (please reconnect)" }))));
+    return () => stops.forEach((stop) => stop());
   }, [children]);
   async function action(body: Record<string, string>) {
     setBusy(true);
@@ -80,7 +69,7 @@ export default function ParentDashboard() {
           <button disabled={busy}>Save name</button>
         </form>
         <p>
-          Ask the student to create a new invitation in their dashboard. Older
+          Any trusted parent, guardian or relative can connect, regardless of surname. Ask the student to create a new invitation in their dashboard. Older
           six-character codes and unverified legacy links must be replaced.
         </p>
         <form
@@ -113,7 +102,7 @@ export default function ParentDashboard() {
             >
               {children.map((id) => (
                 <option key={id} value={id}>
-                  {names[id] || `Student …${id.slice(-6)}`}
+                  {names[id] || "Loading student name…"}
                 </option>
               ))}
             </select>

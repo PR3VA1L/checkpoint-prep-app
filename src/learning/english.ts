@@ -539,6 +539,11 @@ export function readingQuestion(
       text: `Explain the meaning of “${reading.word}” in this text, then give a detail that supports your meaning.`,
       marks: 2,
       answer: reading.meaning,
+      semanticOnly: true,
+      criteria: [
+        { id: "meaning", description: `Gives the contextual meaning of the word: ${reading.meaning}` },
+        { id: "support", description: "Gives a relevant action or detail from this passage supporting that meaning.", dependsOn: ["meaning"] },
+      ],
       guidance:
         "One mark for the contextual meaning; one for a supporting action or detail from the text.",
     },
@@ -547,6 +552,11 @@ export function readingQuestion(
       text: `Explain the effect of “${reading.quote}”. Do not just name a language feature.`,
       marks: 2,
       answer: reading.effect,
+      semanticOnly: true,
+      criteria: [
+        { id: "interpretation", description: `Gives a plausible interpretation of the quoted language. Guidance: ${reading.effect}` },
+        { id: "effect", description: "Explains the effect of a specific word or image, beyond naming a language feature.", dependsOn: ["interpretation"] },
+      ],
       guidance:
         "One mark for a plausible interpretation; one for explaining the effect of a specific word/image.",
     },
@@ -560,6 +570,11 @@ export function readingQuestion(
             : "What does a choice reveal about the main person or organiser? Explain how a precise detail supports your inference.",
       marks: 2,
       answer: reading.inference,
+      semanticOnly: true,
+      criteria: [
+        { id: "inference", description: `Gives a valid inference supported by the passage. Accept alternatives to: ${reading.inference}` },
+        { id: "evidence", description: "Gives a relevant passage detail and links it to that inference.", dependsOn: ["inference"] },
+      ],
       guidance:
         "One mark for a valid inference, one for relevant evidence linked to it.",
     },
@@ -570,6 +585,12 @@ export function readingQuestion(
           ? "Explain the main purpose of this text. Give two choices the writer makes to achieve that purpose."
           : "Explain how the mood changes in this story. Give two details that help create the change.",
       marks: 3,
+      semanticOnly: true,
+      criteria: [
+        { id: "idea", description: reading.paper === 1 ? "Identifies a plausible main purpose of this text." : "Describes the change in mood across this story." },
+        { id: "detail1", description: "Gives one relevant writer choice or detail and explains how it supports the identified purpose or mood.", dependsOn: ["idea"] },
+        { id: "detail2", description: "Gives a second DISTINCT relevant choice or detail and explains its link. Repeating the first detail earns no additional mark.", dependsOn: ["idea"] },
+      ],
       answer:
         reading.paper === 1
           ? "To inform interested readers about the project; accept another supported interpretation, with two relevant choices such as explanation, examples or quotations."
@@ -581,6 +602,13 @@ export function readingQuestion(
       id: "13",
       text: "Give two quotations that show a person responding thoughtfully to a problem. Explain what each quotation shows.",
       marks: 4,
+      semanticOnly: true,
+      criteria: [
+        { id: "quote1", description: "Quotes a relevant part of this passage showing a thoughtful response to a problem." },
+        { id: "explain1", description: "Explains what the first quotation shows about the thoughtful response.", dependsOn: ["quote1"] },
+        { id: "quote2", description: "Quotes a second DISTINCT relevant part of this passage; repeating the first quotation earns no mark." },
+        { id: "explain2", description: "Explains what the second quotation shows about the thoughtful response.", dependsOn: ["quote2"] },
+      ],
       answer:
         reading.inference +
         " Accept two different relevant quotations and reasoned explanations.",

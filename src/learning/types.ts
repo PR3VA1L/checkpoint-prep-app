@@ -19,6 +19,21 @@ export interface Part {
   // never inferred from the model answer or the prose guidance.
   markPoints?: { alternatives: string[] }[];
   choices?: string[];
+  criteria?: MarkCriterion[];
+  // A model/reference answer may omit evidence requested by the question.
+  semanticOnly?: boolean;
+}
+export interface MarkCriterion {
+  id: string;
+  description: string;
+  dependsOn?: string[];
+}
+export interface CriterionResult {
+  id: string;
+  description: string;
+  awarded: boolean;
+  evidence: string;
+  feedback: string;
 }
 export interface Question {
   id: string;
@@ -74,6 +89,7 @@ export interface Answer {
   reviewed?: boolean;
   feedback?: string;
   markingMethod?: "rules" | "model" | "manual" | "pending";
+  criteria?: CriterionResult[];
 }
 export interface Attempt {
   id: string;
@@ -99,4 +115,5 @@ export interface Attempt {
   reading?: { id: string; title: string; paragraphs: string[] };
   writingPrompt?: string;
   markingVersion?: string;
+  mcqProgress?: Record<string, { firstWrong?: string; hint?: boolean }>;
 }

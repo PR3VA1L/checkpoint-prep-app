@@ -16,11 +16,11 @@ for (const [index, row] of rows.entries()) {
     typeof row.question !== "string" || typeof row.scheme !== "string" ||
     typeof row.expected !== "string" || typeof row.answer !== "string" ||
     typeof row.context !== "string" ||
-    !Number.isInteger(row.max) || row.max < 1 || row.max > 4 ||
+    !Number.isInteger(row.max) || row.max < 1 || row.max > 4 || !Array.isArray(row.criteria) || row.criteria.length !== row.max ||
     !Number.isInteger(row.teacherScore) || row.teacherScore < 0 || row.teacherScore > row.max
   ) throw new Error(`Invalid example at index ${index}`);
   try {
-    const result = await markWithModel([{ key: String(index), context: row.context, question: row.question, scheme: row.scheme, expected: row.expected, answer: row.answer, max: row.max }]);
+    const result = await markWithModel([{ key: String(index), context: row.context, question: row.question, scheme: row.scheme, expected: row.expected, answer: row.answer, max: row.max, criteria: row.criteria }]);
     const score = result[String(index)]?.score;
     if (score === undefined) pending++;
     else {

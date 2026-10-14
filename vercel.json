@@ -1,4 +1,5 @@
 {
+  "functions": { "api/mark.ts": { "maxDuration": 120 } },
   "rewrites": [
     {
       "source": "/(.*)",

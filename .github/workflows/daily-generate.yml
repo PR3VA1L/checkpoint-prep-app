@@ -3,10 +3,13 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'src/learning/**'
+      - 'src/**'
       - 'tests/**'
       - 'api/**'
       - 'package*.json'
+      - '.github/workflows/**'
+      - 'firestore.rules'
+      - 'vercel.json'
 permissions:
   contents: read
 jobs:

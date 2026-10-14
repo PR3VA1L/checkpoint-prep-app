@@ -240,6 +240,13 @@ export function passageParts(id: string, difficulty: Difficulty): Part[] {
         : ""),
     answer,
     marks,
+    semanticOnly: marks > 1,
+    ...(marks === 2 ? { criteria: [
+      { id: "point1", description: `One correct distinct idea or detail answering the question, supported by this passage. Reference: ${answer}` },
+      { id: "point2", description: /two|benefits|reasons|things|details/i.test(text)
+        ? `A second distinct correct point from the reference or an equivalent supported answer. Do not count a paraphrase of the first point again. Reference: ${answer}`
+        : `A supporting detail or explanation that develops the first idea and answers the question. Do not count a repetition of the idea. Reference: ${answer}` },
+    ] } : {}),
     guidance:
       marks === 1
         ? "Award 1 mark for the correct detail or equivalent wording."

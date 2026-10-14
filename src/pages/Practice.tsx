@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { Link, useParams, useLocation, Navigate } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
@@ -43,7 +43,7 @@ function PracticeSubject({
   mode: "mcq" | "structured";
 }) {
   const { user, profile } = useAuth(),
-    location = useLocation();
+    location = useLocation(), navigate = useNavigate();
   const uid = user!.uid,
     zone =
       profile?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -73,6 +73,35 @@ function PracticeSubject({
     lock = useRef(false),
     heading = useRef<HTMLHeadingElement>(null);
   const active=attempt?.status==='active',deadline=attempt?.deadline;
+  const autosave = useEffectEvent(async () => {
+    const a = current.current;
+    if (!a || a.status !== "active" || lock.current) return;
+    const snapshot = { ...a, updatedAt: Date.now() };
+    current.current = snapshot;
+    setAttempt(snapshot);
+    lock.current = true;
+    setBusy(true);
+    try {
+      await persistAttempt(uid, snapshot);
+      if (current.current?.updatedAt === snapshot.updatedAt) setCloudSaved(true);
+    } catch {
+      setCloudSaved(false);
+      setError("Automatic save could not sync. Your device draft is kept; retry saving when connected.");
+    } finally { lock.current = false; setBusy(false); }
+  });
+  useEffect(() => {
+    if (!active) return;
+    const timer = window.setInterval(() => { void autosave(); }, 30000);
+    return () => window.clearInterval(timer);
+  }, [active]);
+  function restorePosition(a: Attempt) {
+    const next = a.mode === "mcq" ? a.questions.findIndex((q) => !a.answers[q.id]) : 0;
+    const position = next < 0 ? a.questions.length - 1 : next;
+    setIndex(position);
+    setSelected("");
+    setFirstWrong(a.mcqProgress?.[a.questions[position].id]?.firstWrong ?? null);
+    setHint(a.mcqProgress?.[a.questions[position].id]?.hint ?? false);
+  }
   useEffect(() => {
     if (!active) return;
     const timer = window.setInterval(() => {
@@ -88,6 +117,7 @@ function PracticeSubject({
       if (a.durationSeconds % 15 === 0) {
         a.updatedAt = Date.now();
         saveDraft(uid, a);
+        setCloudSaved(false);
       }
     }, 1000);
     return () => window.clearInterval(timer);
@@ -105,13 +135,14 @@ function PracticeSubject({
   }
   useEffect(() => {
     const id = new URLSearchParams(location.search).get("attempt");
-    if (!id) return;
+    if (!id || current.current?.id === id) return;
+    if (!/^[0-9a-f-]{36}$/i.test(id)) { setError("This saved-session link is invalid."); return; }
     let live = true;
     void getDoc(doc(db, "users", uid, "sessions", id))
       .then((s) => {
         if (live && s.exists()) {
           let a = s.data() as Attempt;
-          if (a.schemaVersion === 2 && a.subject === subject) {
+          if (a.schemaVersion === 2 && a.subject === subject && (mode === "mcq" ? a.mode === "mcq" : a.mode !== "mcq")) {
             const local = loadDraft(uid, subject, a.mode);
             if (
               local?.id === a.id &&
@@ -121,9 +152,10 @@ function PracticeSubject({
             else setCloudSaved(true);
             current.current = a;
             setAttempt(a);
+            restorePosition(a);
             setActiveSeconds(a.activeTimeTracked ? a.durationSeconds || 0 : 0);
-          }
-        }
+          } else setError("This session belongs to another practice section. Open it from My activity.");
+        } else if (live) setError("That saved session could not be found in your account.");
       })
       .catch(() => {
         if (live)
@@ -132,7 +164,7 @@ function PracticeSubject({
     return () => {
       live = false;
     };
-  }, [location.search, subject, uid]);
+  }, [location.search, subject, uid, mode]);
   useEffect(() => {
     if (!active) return;
     const fn = (event: BeforeUnloadEvent) => {
@@ -165,6 +197,8 @@ function PracticeSubject({
             : draft;
         current.current = recovered;
         setAttempt(recovered);
+        restorePosition(recovered);
+        navigate(`${location.pathname}?attempt=${recovered.id}`, { replace: true });
         setActiveSeconds(recovered.activeTimeTracked ? recovered.durationSeconds || 0 : 0);
         setCloudSaved(recovered === cloud);
         setNote(
@@ -176,11 +210,13 @@ function PracticeSubject({
       }
       const a = await startAttempt(
         uid,
-        { ...config, count: config.mode === "mcq" ? config.count : 10 },
+        config,
         timed,
         zone,
       );
       update(a);
+      restorePosition(a);
+      navigate(`${location.pathname}?attempt=${a.id}`, { replace: true });
       setCloudSaved(true);
       if (config.mode === "mcq" && a.questions.length < config.count)
         setNote(
@@ -230,7 +266,7 @@ function PracticeSubject({
   async function sync(a: Attempt, only = a.questions) {
     await syncOutcomes(a, only);
     await persistAttempt(uid, a);
-    setCloudSaved(true);
+    if (current.current?.id === a.id && current.current.updatedAt === a.updatedAt) setCloudSaved(true);
   }
   async function check() {
     const a = current.current;
@@ -239,7 +275,13 @@ function PracticeSubject({
     if (a.answers[q.id]) return;
     if (firstWrong === null && Number(selected) !== q.correctIndex) {
       setFirstWrong(selected);
+      const saved = update({ ...a, mcqProgress: { ...a.mcqProgress, [q.id]: { firstWrong: selected, hint } } });
       setSelected("");
+      lock.current = true;
+      setBusy(true);
+      try { await sync(saved, []); }
+      catch { setError("Your first try is saved on this device. Retry saving when your connection returns."); }
+      finally { lock.current = false; setBusy(false); }
       return;
     }
     lock.current = true;
@@ -413,7 +455,8 @@ function PracticeSubject({
       topic,
       family,
     };
-    const answers = { ...a.answers, [key]: { ...old, score, reviewed: true, markingMethod: "manual" as const, feedback: "Marked using the displayed guidance during manual review." } };
+    const { criteria: _criteria, ...previous } = old;
+    const answers = { ...a.answers, [key]: { ...previous, score, reviewed: true, markingMethod: "manual" as const, feedback: "Marked using the displayed guidance during manual review." } };
     update({ ...a, answers, ...reviewedResult(a, answers) });
   }
   async function retrySave() {
@@ -539,9 +582,9 @@ function PracticeSubject({
               Hard adds connected steps, evidence and reasoning—not older-year
               content or unnecessarily difficult words.
             </p>
-            {mode === "mcq" && (
+            {(mode === "mcq" || subject !== "english") && (
               <>
-                <label htmlFor="count">Maximum questions</label>
+                <label htmlFor="count">{mode === "mcq" ? "Maximum questions" : "Practice length"}</label>
                 <select
                   id="count"
                   value={config.count}
@@ -549,8 +592,8 @@ function PracticeSubject({
                     setConfig({ ...config, count: Number(e.target.value) })
                   }
                 >
-                  {[5, 10, 15].map((n) => (
-                    <option key={n}>{n}</option>
+                  {(mode === "mcq" ? [5, 10, 15] : [1, 5, 10]).map((n) => (
+                    <option key={n} value={n}>{mode === "mcq" ? n : n === 10 ? "Half-paper · 20 marks" : `Focused practice · ${n * 2} marks`}</option>
                   ))}
                 </select>
               </>
@@ -619,18 +662,19 @@ function PracticeSubject({
             )}
             {mode === "structured" && subject !== "english" && (
               <div className="notice">
-                20 marks · half-paper practice ·{" "}
-                {paperPolicy(subject, config.paper).seconds / 60} minutes if
+                {config.count * 2} marks · {config.count === 10 ? "half-paper" : "focused"} practice ·{" "}
+                {paperPolicy(subject, config.paper).seconds * config.count / 600} minutes if
                 timed ·{" "}
                 {paperPolicy(subject, config.paper).calculator
                   ? "calculator allowed"
                   : "no calculator"}
                 . Each selected topic is included.
+                Choose a broad enough mix for {config.count} distinct question types, or use shorter focused practice for a narrow topic.
               </div>
             )}
             {mode === "structured" && (
               <p className="muted">
-                Your written answers are saved to your account and checked against practice marking guidance after submission. Do not include names, addresses or other personal details in your answers. Automatic and AI-assisted marks are practice feedback, not official Cambridge results.
+                {config.mode === "writing" ? "Your writing is saved for review with a parent or teacher using the displayed writing rubric. " : "Your answers are saved and checked against the question’s marking points after submission. "}Do not include names, addresses or other personal details in your answers. Marks are practice feedback, not official Cambridge results.
               </p>
             )}
           </div>
@@ -847,6 +891,16 @@ function PracticeSubject({
                         {attempt.answers[key]?.feedback && (
                           <p className="feedback">{attempt.answers[key].feedback}</p>
                         )}
+                        {attempt.answers[key]?.criteria && (
+                          <ul className="mark-points" aria-label="Marks earned and points to improve">
+                            {attempt.answers[key].criteria.map((point) => (
+                              <li key={point.id} className={point.awarded ? "mark-earned" : "mark-missed"}>
+                                <strong>{point.awarded ? "✓ 1 mark" : "0 marks"}</strong>: {point.feedback}
+                                {point.evidence && <p className="muted">Your evidence: “{point.evidence}”</p>}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <details>
                           <summary>Answer and marking guidance</summary>
                           <p>{p.answer}</p>
@@ -906,7 +960,7 @@ function PracticeSubject({
               View history
             </Link>
             <button
-              disabled={!cloudSaved}
+              disabled={busy || !cloudSaved}
               onClick={() => {
                 current.current = null;
                 setAttempt(null);
@@ -916,6 +970,9 @@ function PracticeSubject({
                 setFirstWrong(null);
                 setHint(false);
                 setNote("");
+                setError("");
+                setConfirmFinish(false);
+                navigate(location.pathname, { replace: true });
               }}
             >
               New session
@@ -935,9 +992,9 @@ function PracticeSubject({
             <div className="options">
               {q.options.map((option, i) => (
                 <button
-                  className={`option ${(answer?.value ?? selected) === String(i) ? "selected" : ""} ${firstWrong === String(i) ? "wrong-choice" : ""}`}
+                  className={`option ${(answer?.value ?? selected) === String(i) ? "selected" : ""} ${firstWrong === String(i) || (answer?.value === String(i) && i !== q.correctIndex) ? "wrong-choice" : ""}`}
                   aria-pressed={(answer?.value ?? selected) === String(i)}
-                  disabled={!!answer || busy}
+                  disabled={!!answer || busy || firstWrong === String(i)}
                   key={option}
                   onClick={() => setSelected(String(i))}
                 >
@@ -955,7 +1012,7 @@ function PracticeSubject({
               </div>
             )}
             {answer && (
-              <div className="feedback" role="status">
+              <div className={`feedback ${answer.score ? "" : "incorrect"}`} role="status">
                 <h3>
                   {answer.score
                     ? "Correct—well done."
@@ -977,7 +1034,11 @@ function PracticeSubject({
                   <button disabled={selected === "" || busy} onClick={check}>
                     Check answer
                   </button>
-                  <button className="secondary" onClick={() => setHint(true)}>
+                  <button className="secondary" disabled={busy} onClick={() => {
+                    setHint(true);
+                    const a = current.current!;
+                    update({ ...a, mcqProgress: { ...a.mcqProgress, [q.id]: { ...a.mcqProgress?.[q.id], hint: true } } });
+                  }}>
                     Give me a hint
                   </button>
                 </>

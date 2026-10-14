@@ -33,6 +33,10 @@
 * {
   box-sizing: border-box;
 }
+.mark-points { padding-left: 1.4rem; }
+.mark-points li { margin-block: 0.6rem; }
+.mark-earned > strong { color: var(--success); }
+.mark-missed > strong { color: var(--danger); }
 body {
   margin: 0;
   background: var(--bg);

@@ -48,7 +48,7 @@ export async function startAttempt(
       questions.length < config.count
     )
       throw new Error(
-        "There are not enough fresh questions for a complete half-paper in those topics today. Add topics or choose a different difficulty. No shorter paper has been substituted.",
+        `Only ${questions.length} distinct question types are fresh in these topics today; this session needs ${config.count}. Choose shorter focused practice, add more topics, or leave all topics unselected. Variations of the same question will not be used to fill it.`,
       );
     const id = crypto.randomUUID(),
       now = Date.now(),
@@ -89,7 +89,7 @@ export async function startAttempt(
         ? {
             deadline:
               now +
-              (config.mode === "mcq" ? questions.length * 60 : policy.seconds) *
+              (config.mode === "mcq" ? questions.length * 60 : config.subject !== "english" ? policy.seconds * questions.length / 10 : policy.seconds) *
                 1000,
           }
         : {}),
@@ -175,6 +175,8 @@ export async function recordOutcome(
   });
 }
 export async function persistAttempt(uid: string, a: Attempt) {
+  // Snapshot before the async transaction: the active-time clock may advance meanwhile.
+  a = clean(a);
   const ref = doc(db, "users", uid, "sessions", a.id);
   await runTransaction(db, async (tx) => {
     const latest = await tx.get(ref);
@@ -191,8 +193,11 @@ export async function persistAttempt(uid: string, a: Attempt) {
       timestamp: Timestamp.fromMillis(a.completedAt || a.startedAt),
     });
   });
-  if (a.status === "completed") clearDraft(uid, a.subject, a.mode);
-  else saveDraft(uid, a);
+  const local = loadDraft(uid, a.subject, a.mode);
+  if (!local || (local.id === a.id && (local.updatedAt || 0) <= (a.updatedAt || 0))) {
+    if (a.status === "completed") clearDraft(uid, a.subject, a.mode);
+    else saveDraft(uid, a);
+  }
 }
 const key = (uid: string, subject: string, mode: string) =>
   `checkpoint-v3:${uid}:${subject}:${mode}`;
@@ -249,7 +254,7 @@ export function subscribeAttempts(
           return {
             ...v,
             id: d.id,
-            completedAt: v.completedAt || v.timestamp?.toMillis?.(),
+            completedAt: v.completedAt || (v.status !== "active" ? v.timestamp?.toMillis?.() : undefined),
             status: v.status || "completed",
             grading:
               v.grading ||

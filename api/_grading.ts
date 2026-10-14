@@ -1,13 +1,14 @@
 import { FAMILIES, fingerprint } from "../src/learning/engine.js";
 import { READINGS, readingQuestion } from "../src/learning/english.js";
-import type { Attempt, Part, Question, Answer } from "../src/learning/types";
+import type { Attempt, Part, Question, Answer, MarkCriterion, CriterionResult } from "../src/learning/types";
 
-export const MARK_SCHEME_VERSION = "checkpoint-authored-v2";
+export const MARK_SCHEME_VERSION = "checkpoint-criteria-v3";
 export type MarkedPart = {
   score: number;
   feedback: string;
   method: "rules" | "model" | "pending";
   confidence: number;
+  criteria?: CriterionResult[];
 };
 export type MarkingJob = {
   key: string;
@@ -17,6 +18,7 @@ export type MarkingJob = {
   expected: string;
   answer: string;
   max: number;
+  criteria?: MarkCriterion[];
 };
 
 // Reconstruct the authored question on the server. A Firestore session is
@@ -64,7 +66,9 @@ const normalise = (value: string) =>
   value
     .normalize("NFKC")
     .toLowerCase()
-    .replace(/[.,!?;:'“”‘’()]/g, "")
+    // Decimal points and coordinate separators are meaningful answer content.
+    .replace(/[.!?]$/, "")
+    .replace(/[!?;:'“”‘’]/g, "")
     .replace(/\s*\/\s*/g, "/")
     .replace(/\s+/g, " ")
     .trim();
@@ -81,14 +85,13 @@ function simpleNumber(value: string): { number: number; unit: string } | null {
 }
 
 function criteriaMark(part: Part, response: string): MarkedPart | null {
-  if (!part.markPoints?.length || part.markPoints.length !== part.marks) return null;
+  if (!part.markPoints?.length || part.marks !== 1 || part.markPoints.length !== 1) return null;
   const words = ` ${normalise(response).replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
   // A phrase hit is evidence, not proof. Negation, uncertainty, or a correction
   // may reverse its meaning, so leave these responses for semantic review.
   if (/\b(no|not|never|isnt|doesnt|dont|cannot|cant|wrong|incorrect|but|however|maybe|perhaps)\b/.test(words)) return null;
   const allFound = part.markPoints.every((point) => point.alternatives.some((alternative) => {
-    const phrase = normalise(alternative).replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-    return phrase.length >= 4 && words.includes(` ${phrase} `);
+    return normalise(response) === normalise(alternative);
   }));
   if (!allFound) return null;
   return {
@@ -108,7 +111,7 @@ export function ruleMark(part: Part, response: string): MarkedPart {
       confidence: 1,
     };
   const exact = [part.answer, ...(part.exact || [])];
-  if (exact.some((x) => normalise(x) === normalise(response)))
+  if (!part.semanticOnly && exact.some((x) => normalise(x) === normalise(response)))
     return {
       score: part.marks,
       feedback: "Your answer matches the marking guidance for this part.",
@@ -117,7 +120,7 @@ export function ruleMark(part: Part, response: string): MarkedPart {
     };
   const given = simpleNumber(response);
   const formSensitive = /fraction|simplest form|decimal places|nearest|round(?:ed)?|percentage|percent|coordinate|ratio/i.test(part.text);
-  if (!formSensitive && given && exact.some((x) => {
+  if (!part.semanticOnly && !formSensitive && given && exact.some((x) => {
     const target = simpleNumber(x);
     return target && target.unit === given.unit && Math.abs(target.number - given.number) < 1e-9;
   }))
@@ -127,7 +130,7 @@ export function ruleMark(part: Part, response: string): MarkedPart {
       method: "rules",
       confidence: 1,
     };
-  const criteria = criteriaMark(part, response);
+  const criteria = part.semanticOnly ? null : criteriaMark(part, response);
   if (criteria) return criteria;
   // A different answer may still earn a method/evidence mark. Never infer zero
   // from a failed string comparison.
@@ -144,6 +147,8 @@ export function prepareMarking(attempt: Attempt) {
     throw new Error("Only submitted structured practice can be marked automatically.");
   if (!Array.isArray(attempt.questions) || attempt.questions.length < 1 || attempt.questions.length > 20)
     throw new Error("Invalid structured paper.");
+  if (![1, 2].includes(attempt.paper) || new Set(attempt.questions.map((q) => q.id)).size !== attempt.questions.length ||
+      attempt.questions.some((q) => q.subject !== attempt.subject)) throw new Error("Invalid structured paper identity.");
   const results: Record<string, MarkedPart> = {};
   const jobs: MarkingJob[] = [];
   for (const stored of attempt.questions) {
@@ -159,16 +164,27 @@ export function prepareMarking(attempt: Attempt) {
       const result = ruleMark(part, response);
       if (result.method === "rules" && result.score > 0)
         result.feedback = `Correct. ${q.subject === "english" ? part.guidance : q.explanation}`.slice(0, 500);
+      const criteria = part.criteria || (part.marks === 1
+        ? [{ id: "point1", description: part.guidance + " Reference answer: " + part.answer }]
+        : undefined);
+      if (!criteria || criteria.length !== part.marks || new Set(criteria.map((c) => c.id)).size !== criteria.length)
+        throw new Error("This question needs a complete point-by-point mark scheme.");
+      if (result.method === "rules") result.criteria = criteria.map((criterion) => ({
+        id: criterion.id, description: criterion.description,
+        awarded: result.score === part.marks, evidence: response,
+        feedback: result.score ? "Awarded under this question’s marking guidance." : "No answer was submitted.",
+      }));
       results[key] = result;
       if (result.method === "pending")
         jobs.push({
           key,
-          context: reading ? reading.paragraphs.join("\n\n") : q.context,
+          context: reading ? reading.paragraphs.join("\n\n") : q.context + (q.diagram ? "\nDiagram data: " + JSON.stringify(q.diagram) : ""),
           question: part.text,
           scheme: part.guidance,
           expected: part.answer,
           answer: response,
           max: part.marks,
+          criteria,
         });
     }
   }
@@ -199,6 +215,7 @@ export function applyMarks(
         reviewed: result.method !== "pending",
         feedback: result.feedback,
         markingMethod: result.method,
+        ...(result.criteria ? { criteria: result.criteria } : {}),
       };
       total += result.score;
       usedModel ||= result.method === "model";
@@ -206,8 +223,10 @@ export function applyMarks(
     }
   return {
     ...attempt,
+    questions: attempt.questions.map((q) => canonicalQuestion(q, attempt.paper)),
     answers,
     score: total,
+    total: attempt.questions.reduce((sum, q) => sum + q.parts.reduce((n, p) => n + p.marks, 0), 0),
     grading: pending ? "awaiting-review" : usedModel ? "ai-assisted" : "automatic",
     markingVersion: MARK_SCHEME_VERSION,
     updatedAt: Date.now(),
